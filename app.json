@@ -1,15 +1,16 @@
 {
   "expo": {
-    "name": "WorkNLife-Mobile",
+    "name": "WorkNLife",
     "slug": "WorkNLife-Mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/WOrkNLife.png",
     "scheme": "worknlifemobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.WorkNLifeMobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.WorkNLifeMobile"
     },
     "web": {
       "output": "static",
@@ -34,6 +36,7 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
+          "border": 0,
           "dark": {
             "backgroundColor": "#000000"
           }
@@ -43,6 +46,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f54edb2f-2944-4020-aed0-b23aaf9b8097"
+      }
     }
   }
 }

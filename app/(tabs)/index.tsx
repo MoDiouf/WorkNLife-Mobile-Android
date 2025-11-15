@@ -1,98 +1,205 @@
+import { View, TouchableOpacity, StyleSheet, ImageSourcePropType } from 'react-native';
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { HelloWave } from '@/components/hello-wave';
+import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { FeaturedCarousel } from '@/components/ui/FeaturedCarousel';
 
 export default function HomeScreen() {
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
+      headerBackgroundColor={{ light: '#ffffffff', dark: '#000' }}
+      headerImage={<View  />}
+      headerHeight={0}
+    >
+      {/* HEADER */}
+      <ThemedView style={styles.header}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ThemedText type="title" style={{ fontSize: 32 }}>Bonjour !</ThemedText>
+          <HelloWave />
+        </View>
+        <ThemedText style={styles.subtitle}>
+          Que souhaitez-vous faire aujourd’hui ?
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+        {/* Location Badge */}
+        <View style={styles.locationBadge}>
+          <Ionicons name="location" size={16} color="#fff" />
+          <ThemedText style={{ color: '#fff' }}>Paris, France</ThemedText>
+        </View>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
+
+      {/* SERVICES */}
+      <ThemedView style={styles.section}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>
+          Nos Services
         </ThemedText>
+
+        <View style={styles.grid}>
+          
+          {/* COVOITURAGE */}
+          <ServiceCard
+            image={require('./../../assets/images/convoiturage.jpeg')}
+            title="Covoiturage"
+            subtitle="Partagez vos trajets"
+            icon="car"
+            color="#3ABEFF"
+            description='Économique et écologique'
+          />
+
+          {/* COMMANDES */}
+          <ServiceCard
+            image={require('@/assets/images/commande.jpeg')}
+            title="Commandes"
+            subtitle="Livraison de repas"
+            icon="fast-food"
+            color="#FFB800"
+            description='Délicieux à votre porte'
+          />
+
+          {/* HEALTHY */}
+          <ServiceCard
+            image={require('@/assets/images/commade.jpeg')}
+            title="Healthy"
+            subtitle="Bien-être & santé"
+            icon="heart"
+            color="#00E18C"
+            description='Prenez soin de vous'
+          />
+
+          {/* LOISIRS */}
+          <ServiceCard
+            image={require('@/assets/images/loisir.webp')}
+            title="Loisirs"
+            subtitle="Divertissement"
+            icon="game-controller"
+            color="#B07CFF"
+            description='Détendez-vous et amusez-vous'
+          />
+
+        </View>
       </ThemedView>
+
+      
+      <ThemedView style={styles.section}>
+        <View style={styles.rowBetween}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>À la une</ThemedText>
+          <Link href="/"><ThemedText style={styles.link}>Voir tout →</ThemedText></Link>
+        </View>
+
+        <FeaturedCarousel />
+      </ThemedView>
+
     </ParallaxScrollView>
   );
 }
 
+
+interface ServiceCardProps {
+  image: ImageSourcePropType;
+  title: string;
+  subtitle: string;
+  icon:  keyof typeof Ionicons.glyphMap;
+  color: string;
+  description: string;
+}
+
+function ServiceCard({ image , title, subtitle, icon, color , description }: ServiceCardProps) {
+  return (
+    <TouchableOpacity style={styles.card}>
+      <Image source={image} style={styles.cardImage} contentFit="cover" />
+      <View style={[styles.iconBadge, { backgroundColor: color }]}>
+        <Ionicons name={icon} size={18} color="#fff" />
+      </View>
+      <View style={styles.cardFooter}>
+        <ThemedText style={styles.cardTitle}>{title}</ThemedText>
+        <ThemedText style={styles.cardSubtitle}>{subtitle}</ThemedText>
+        <ThemedText style={{ color: '#666868ff', fontSize: 10 }}>{description}</ThemedText>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  titleContainer: {
+  header: {
+    gap: 8,
+    marginBottom: 20,
+  },
+  subtitle: {
+    color: '#AAA',
+    fontSize: 14,
+  },
+  locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    backgroundColor: '#333',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    width: 130,
+    borderRadius: 20,
+    marginTop: 6,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  section: {
+    marginTop: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  sectionTitle: {
+    fontSize: 20,
+    marginBottom: 10,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  card: {
+    width: '47%',
+    height: 210,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#222',
+  },
+  cardImage: {
+    width: '100%',
+    height: '65%',
+  },
+  iconBadge: {
     position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 6,
+    borderRadius: 20,
+  },
+  cardFooter: {
+    height: '30%',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    gap:0,
+  },
+  cardTitle: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  cardSubtitle: {
+    color: '#AAA',
+    fontSize: 12,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  link: {
+    color: '#4ADE80',
+  },
+  topImage: {
+    width: '100%',
+    height: 200,
+    marginTop: 10,
+    borderRadius: 16,
   },
 });
