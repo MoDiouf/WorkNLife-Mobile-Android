@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 
 export default function Repas() {
   const allRestaurants = [
@@ -17,35 +17,171 @@ export default function Repas() {
       description: "Poulet braisé, thiebou dieune, spécialités sénégalaises…",
       rating: 4.8,
       image: require("../../assets/images/commande.jpeg"),
+      menus: {
+        petitDej: [
+          {
+            title: "Café Touba",
+            description: "Café sénégalais épicé servi chaud.",
+            price: "1.000 CFA",
+          },
+          {
+            title: "Beignet + Jus",
+            description: "Beignets croustillants accompagnés de jus naturel.",
+            price: "1.500 CFA",
+          },
+        ],
+        dejeuner: [
+          {
+            title: "Thiebou Dieune",
+            description: "Riz au poisson sénégalais, légumes mijotés.",
+            price: "2.500 CFA",
+          },
+          {
+            title: "Poulet Braisé",
+            description: "Poulet grillé au charbon avec épices locales.",
+            price: "3.500 CFA",
+          },
+        ],
+      },
     },
+
     {
       name: "La Terrasse",
       description: "Pizza, pâtes fraîches, grillades…",
       rating: 4.6,
       image: require("../../assets/images/commande.jpeg"),
+      menus: {
+        petitDej: [
+          {
+            title: "Cappuccino",
+            description: "Café onctueux avec mousse de lait.",
+            price: "2.000 CFA",
+          },
+          {
+            title: "Croissant Beurre",
+            description: "Croissant français croustillant.",
+            price: "1.000 CFA",
+          },
+        ],
+        dejeuner: [
+          {
+            title: "Pizza Margherita",
+            description: "Tomate fraîche, mozzarella, basilic.",
+            price: "4.000 CFA",
+          },
+          {
+            title: "Pâtes Carbonara",
+            description: "Crème, lardons, parmesan, poivre noir.",
+            price: "4.500 CFA",
+          },
+        ],
+      },
     },
+
     {
       name: "Le Jardin",
       description: "Cuisine française raffinée, plats végétariens…",
       rating: 4.7,
       image: require("../../assets/images/commande.jpeg"),
+      menus: {
+        petitDej: [
+          {
+            title: "Thé Vert + Biscuit",
+            description: "Thé chaud accompagné de biscuits au beurre.",
+            price: "1.200 CFA",
+          },
+          {
+            title: "Omelette Fromage",
+            description: "Oeufs battus avec fromage fondant.",
+            price: "2.000 CFA",
+          },
+        ],
+        dejeuner: [
+          {
+            title: "Salade César",
+            description: "Laitue, poulet grillé, parmesan, croûtons.",
+            price: "3.000 CFA",
+          },
+          {
+            title: "Gratin Dauphinois",
+            description: "Pommes de terre, crème et fromage gratiné.",
+            price: "3.800 CFA",
+          },
+        ],
+      },
     },
+
     {
       name: "Sunset Café",
       description: "Café, smoothies, brunch…",
       rating: 4.5,
       image: require("../../assets/images/commande.jpeg"),
+      menus: {
+        petitDej: [
+          {
+            title: "Smoothie Mangue",
+            description: "Smoothie frais à la mangue naturelle.",
+            price: "2.000 CFA",
+          },
+          {
+            title: "Toast Avocat",
+            description: "Avocat crémeux sur pain grillé.",
+            price: "2.500 CFA",
+          },
+        ],
+        dejeuner: [
+          {
+            title: "Salade Fraîcheur",
+            description: "Mélange de légumes frais et vinaigrette légère.",
+            price: "3.000 CFA",
+          },
+          {
+            title: "Wrap Poulet",
+            description: "Poulet grillé, crudités et sauce blanche.",
+            price: "3.200 CFA",
+          },
+        ],
+      },
     },
+
     {
       name: "Bistro Dakar",
       description: "Grillades, plats locaux, ambiance chaleureuse…",
       rating: 4.6,
       image: require("../../assets/images/commande.jpeg"),
+      menus: {
+        petitDej: [
+          {
+            title: "Café Lait",
+            description: "Café doux avec lait chaud.",
+            price: "1.000 CFA",
+          },
+          {
+            title: "Omelette complète",
+            description: "Oeufs, légumes, fromage et jambon.",
+            price: "1.800 CFA",
+          },
+        ],
+        dejeuner: [
+          {
+            title: "Mafé",
+            description: "Sauce d’arachide avec viande et riz.",
+            price: "2.500 CFA",
+          },
+          {
+            title: "Brochettes + Frites",
+            description: "Brochettes de viande grillée avec frites.",
+            price: "3.500 CFA",
+          },
+        ],
+      },
     },
   ];
 
   const [showAll, setShowAll] = useState(false);
-  const restaurantsToDisplay = showAll ? allRestaurants : allRestaurants.slice(0, 3);
+  const restaurantsToDisplay = showAll
+    ? allRestaurants
+    : allRestaurants.slice(0, 3);
 
   return (
     <ScrollView style={styles.container}>
@@ -76,7 +212,9 @@ export default function Repas() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Restaurant en vedette</Text>
         <TouchableOpacity onPress={() => setShowAll(!showAll)}>
-          <Text style={styles.link}>{showAll ? "Voir moins" : "Voir tout"}</Text>
+          <Text style={styles.link}>
+            {showAll ? "Voir moins" : "Voir tout"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -101,15 +239,20 @@ export default function Repas() {
     </ScrollView>
   );
 }
-
+type MenuItem = {
+  title: string;
+  description: string;
+  price: string;
+};
 type Restaurant = {
   name: string;
   description: string;
   rating: number;
   image: any;
+  menus: { petitDej: MenuItem[]; dejeuner: MenuItem[] };
 };
 
-function RestaurantCard({ name, description, rating, image }: Restaurant) {
+function RestaurantCard({ name, description, rating, image, menus }: Restaurant) {
   return (
     <View style={styles.card}>
       <Image source={image} style={styles.cardImage} />
@@ -123,7 +266,17 @@ function RestaurantCard({ name, description, rating, image }: Restaurant) {
 
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => router.push(`../menu/${encodeURIComponent(name)}`)}
+            onPress={() =>
+              router.push({
+                pathname: "/menu/[restaurant]",
+                params: {
+                  restaurant: name,
+                  description: description,
+                  rating: rating.toString(),
+                  menus: JSON.stringify(menus),
+                },
+              })
+            }
           >
             <Ionicons name="arrow-forward" size={18} color="#fff" />
             <Text style={styles.addButtonText}>Voir menu</Text>
