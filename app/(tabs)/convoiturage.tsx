@@ -74,6 +74,15 @@ export default function Convoiturage() {
     setModalVisible(true);
   };
 
+  const colors = {
+    bg: isDark ? "#121212" : "#f5f5f5",
+    card: isDark ? "#1e1e1e" : "#ffffff",
+    text: isDark ? "#ffffff" : "#000000",
+    subText: isDark ? "#b5b5b5" : "#555555",
+    green: "#4ade80",
+    tagBg: isDark ? "rgba(74,222,128,0.15)" : "rgba(74,222,128,0.20)",
+    divider: isDark ? "#2f2f2f" : "#e5e5e5",
+  };
   return (
     <ScrollView
       style={[
@@ -82,16 +91,17 @@ export default function Convoiturage() {
       ]}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace("/settings")}>
-          <Ionicons
-            name="person-circle-outline"
-            size={32}
-            color={isDark ? "#fff" : "#000"}
-          />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Covoiturage</Text>
-      </View>
+              <Text style={[styles.title, { color: colors.text }]}>Covoiturage</Text>
+              <Text style={[styles.subtitle, { color: colors.subText }]}>
+                Pour une ville plus ecologique
+              </Text>
+              <Ionicons
+                name="car-sport-outline"
+                size={22}
+                color={colors.text}
+                style={{ position: "absolute", right: 0, top: 10 }}
+              />
+            </View>
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
@@ -437,18 +447,14 @@ export default function Convoiturage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 60 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal:10,
-    alignItems: "center",
-    marginBottom: 16,
-    marginTop: 20,
-  },
+  
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
   },
+  header: { marginTop: 0 },
+  title: { fontSize: 26, fontWeight: "700" },
+  subtitle: { fontSize: 15, marginTop: 4,marginBottom:10 },
   tabsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -495,7 +501,7 @@ const styles = StyleSheet.create({
   },
   tabText: { fontSize: 15, fontWeight: "600", marginLeft: 6 },
   searchBox: { borderRadius: 16, padding: 16, marginBottom: 20 },
-  subtitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
+  //subtitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
   input: { marginBottom: 12, padding: 12, borderRadius: 12, fontSize: 15 },
   searchButton: {
     flexDirection: "row",
