@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   carouselCategory: {
-    color: '#4ADE80',
+    color: '#1043b1',
     fontSize: 12,
     marginBottom: 4,
   },

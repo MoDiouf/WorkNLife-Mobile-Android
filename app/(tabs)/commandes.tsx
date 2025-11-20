@@ -188,14 +188,14 @@ export default function Repas() {
     : allRestaurants.slice(0, 3);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: isDark ? "#0d0d0d" : "#fff" }]}>
+    <ScrollView 
+    style={[styles.container, { backgroundColor: isDark ? "#0d0d0d" : "#fff" }]}
+    showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace("/settings")}>
-          <Ionicons name="person-circle-outline" size={32} color={isDark ? "#fff" : "#000"} />
-        </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Commande de Repas</Text>
+        <Text style={[styles.headerTitle,{color: isDark ? "#fff" : "#000",}]}>Commande de Repas</Text>
 
         <TouchableOpacity>
           <Ionicons name="cart-outline" size={28} color={isDark ? "#fff" : "#000"}/>
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 23,
     fontWeight: "600",
   },
 

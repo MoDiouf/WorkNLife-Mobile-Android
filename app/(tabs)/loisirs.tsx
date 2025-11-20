@@ -106,7 +106,10 @@ const renderActivityCard = (item: any, colors: any) => (
 );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <ScrollView 
+    style={[styles.container, { backgroundColor: colors.bg }]}
+    showsVerticalScrollIndicator={false}
+    >
       
       {/* HEADER */}
       <View style={styles.header}>
@@ -150,7 +153,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
 
   header: { marginTop: 40 },
-  title: { fontSize: 26, fontWeight: "700" },
+  title: { fontSize: 23, fontWeight: "700" },
   subtitle: { fontSize: 15, marginTop: 4,marginBottom:10 },
 
   statsRow: {

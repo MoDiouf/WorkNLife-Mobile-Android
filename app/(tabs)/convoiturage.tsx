@@ -89,6 +89,7 @@ export default function Convoiturage() {
         styles.container,
         { backgroundColor: isDark ? "#0d0d0d" : "#ffffff" },
       ]}
+      showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
               <Text style={[styles.title, { color: colors.text }]}>Covoiturage</Text>
@@ -453,7 +454,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   header: { marginTop: 0 },
-  title: { fontSize: 26, fontWeight: "700" },
+  title: { fontSize: 23, fontWeight: "700" },
   subtitle: { fontSize: 15, marginTop: 4,marginBottom:10 },
   tabsContainer: {
     flexDirection: "row",
