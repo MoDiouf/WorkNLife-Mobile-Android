@@ -1,55 +1,73 @@
 import { Tabs } from "expo-router";
 import React from "react";
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 import { HapticTab } from "@/components/haptic-tab";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const themeColors = Colors[colorScheme ?? "light"];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarActiveTintColor: themeColors.tint,
+        tabBarInactiveTintColor: isDark ? "#aaa" : "#666",
+        tabBarStyle: {
+          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          borderTopWidth: 0,
+          elevation: 5,
+          height: 80,
+        },
+        tabBarButton:undefined,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Accueil',
-          tabBarIcon: ({ color }) => <FontAwesome name="home" size={28} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="commandes"
         options={{
           title: 'Repas',
-          tabBarIcon: ({ color }) => <FontAwesome name="cutlery" size={28} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="restaurant-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="convoiturage"
         options={{
-          title: 'Convoiturage',
-          tabBarIcon: ({ color }) => <FontAwesome name="car" size={28} color={color} />,
+          title: 'Covoiturage',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="car-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="loisirs"
         options={{
           title: 'Loisirs',
-          tabBarIcon: ({ color }) => <FontAwesome name="gamepad" size={28} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="game-controller-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <FontAwesome name="cog" size={28} color={color} />,
+          title: 'Paramètres',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

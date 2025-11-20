@@ -6,11 +6,15 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 
 export default function Repas() {
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
+
   const allRestaurants = [
     {
       name: "Chez Mamadou",
@@ -184,22 +188,22 @@ export default function Repas() {
     : allRestaurants.slice(0, 3);
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: isDark ? "#0d0d0d" : "#fff" }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace("/settings")}>
-          <Ionicons name="person-circle-outline" size={32} />
+          <Ionicons name="person-circle-outline" size={32} color={isDark ? "#fff" : "#000"} />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>Commande de Repas</Text>
 
         <TouchableOpacity>
-          <Ionicons name="cart-outline" size={28} />
+          <Ionicons name="cart-outline" size={28} color={isDark ? "#fff" : "#000"}/>
         </TouchableOpacity>
       </View>
 
       {/* Banner */}
-      <View style={styles.banner}>
+      <View style={[styles.banner, { backgroundColor: isDark ? "#333" : "#ccc" }]}>
         <View style={styles.bannerTextContainer}>
           <Text style={styles.bannerTitle}>Offre Spéciale</Text>
           <Text style={styles.bannerSubtitle}>
@@ -210,20 +214,20 @@ export default function Repas() {
 
       {/* Featured header */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Restaurant en vedette</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? "#fff" : "#000" }]}>Restaurant en vedette</Text>
         <TouchableOpacity onPress={() => setShowAll(!showAll)}>
-          <Text style={styles.link}>
+          <Text style={[styles.link, { color: "#1E40AF" }]}>
             {showAll ? "Voir moins" : "Voir tout"}
           </Text>
         </TouchableOpacity>
       </View>
 
       {restaurantsToDisplay.map((resto, index) => (
-        <RestaurantCard key={index} {...resto} />
+        <RestaurantCard key={index} {...resto} isDark={isDark}/>
       ))}
 
       {/* Bottom buttons */}
-      <View style={styles.bottomButtons}>
+      <View style={[styles.bottomButtons]}>
         <TouchableOpacity style={[styles.bottomButton, { marginRight: 8 }]}>
           <Ionicons name="time-outline" size={24} />
           <Text style={styles.bottomButtonLabel}>Historique</Text>
@@ -252,20 +256,19 @@ type Restaurant = {
   menus: { petitDej: MenuItem[]; dejeuner: MenuItem[] };
 };
 
-function RestaurantCard({ name, description, rating, image, menus }: Restaurant) {
+function RestaurantCard({ name, description, rating, image, menus, isDark }: Restaurant & { isDark: boolean }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: isDark ? "#1a1a1a" : "#fff" }]}>
       <Image source={image} style={styles.cardImage} />
-
       <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{name}</Text>
-        <Text style={styles.cardSubtitle}>{description}</Text>
+        <Text style={[styles.cardTitle, { color: isDark ? "#fff" : "#000" }]}>{name}</Text>
+        <Text style={[styles.cardSubtitle, { color: isDark ? "#ccc" : "#6B7280" }]}>{description}</Text>
 
         <View style={styles.cardFooter}>
-          <Text>⭐ {rating}</Text>
+          <Text style={{ color: isDark ? "#fff" : "#000" }}>⭐ {rating}</Text>
 
           <TouchableOpacity
-            style={styles.addButton}
+            style={[styles.addButton, { backgroundColor: isDark ? "#2563EB" : "#2563EB" }]}
             onPress={() =>
               router.push({
                 pathname: "/menu/[restaurant]",
@@ -286,12 +289,13 @@ function RestaurantCard({ name, description, rating, image, menus }: Restaurant)
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 30,
   },
 
   // Header
