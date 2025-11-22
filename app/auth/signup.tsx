@@ -4,15 +4,20 @@ import {
   Text, 
   TextInput, 
   TouchableOpacity, 
-  StyleSheet 
+  StyleSheet, 
+  useColorScheme
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import TimelineBackground from "@/components/AnimatedBackground";
+import WorkNLifeLogo from "@/assets/images/WorkNLife-OG.svg";
+import WorkNLifeLogoWhite from "@/assets/images/WorkNLife-OG-white.svg";
 
 export default function Signup() {
   const router = useRouter();
   const [secure, setSecure] = useState(true);
+  const theme = useColorScheme(); // "dark" ou "light"
+const isDark = theme === "dark";
 
   const [form, setForm] = useState({
     full_name: "",
@@ -35,78 +40,76 @@ export default function Signup() {
   };
 
   return (
-    <View style={styles.container}>
-      <TimelineBackground />
-      {/* Logo */}
-      <View style={styles.logoBox}>
-        <Ionicons name="people" size={40} color="#fff" />
+    <View style={[styles.container, { backgroundColor: isDark ? "#000" : "#fff" }]}>
+  {/* Logo */}
+  <View style={{ marginBottom: 0 }}>
+        {isDark ? <WorkNLifeLogoWhite width={280} height={150} />  : <WorkNLifeLogo width={280} height={150} />}
+        
       </View>
 
-      <Text style={styles.title}>WorkNLife</Text>
-      <Text style={styles.subtitle}>Créez votre compte</Text>
-      <Text style={styles.sectionTitle}>Inscription</Text>
+  {/* Titres */}
+  <Text style={[styles.subtitle, { color: isDark ? "#aaa" : "#666" }]}>Créez votre compte</Text>
+  <Text style={[styles.sectionTitle, { color: isDark ? "#fff" : "#000" }]}>Inscription</Text>
 
-      {/* Nom complet */}
-      <Text style={styles.label}>Nom complet</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Votre nom complet"
-        placeholderTextColor="#aaa"
-        value={form.full_name}
-        onChangeText={(v) => handleChange("full_name", v)}
-      />
+  {/* Nom complet */}
+  <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>Nom complet</Text>
+  <TextInput
+    style={[styles.input, { backgroundColor: isDark ? "#111" : "#fff", color: isDark ? "#fff" : "#000", borderColor: isDark ? "#444" : "#ddd" }]}
+    placeholder="Votre nom complet"
+    placeholderTextColor={isDark ? "#888" : "#aaa"}
+    value={form.full_name}
+    onChangeText={(v) => handleChange("full_name", v)}
+  />
 
-      {/* Email */}
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="exemple@email.com"
-        placeholderTextColor="#aaa"
-        value={form.email}
-        onChangeText={(v) => handleChange("email", v)}
-      />
+  {/* Email */}
+  <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>Email</Text>
+  <TextInput
+    style={[styles.input, { backgroundColor: isDark ? "#111" : "#fff", color: isDark ? "#fff" : "#000", borderColor: isDark ? "#444" : "#ddd" }]}
+    placeholder="exemple@email.com"
+    placeholderTextColor={isDark ? "#888" : "#aaa"}
+    value={form.email}
+    onChangeText={(v) => handleChange("email", v)}
+  />
 
-      {/* Téléphone */}
-      <Text style={styles.label}>Téléphone</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="774060998"
-        placeholderTextColor="#aaa"
-        keyboardType="numeric"
-        value={form.phone}
-        onChangeText={(v) => handleChange("phone", v)}
-      />
+  {/* Téléphone */}
+  <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>Téléphone</Text>
+  <TextInput
+    style={[styles.input, { backgroundColor: isDark ? "#111" : "#fff", color: isDark ? "#fff" : "#000", borderColor: isDark ? "#444" : "#ddd" }]}
+    placeholder="774060998"
+    placeholderTextColor={isDark ? "#888" : "#aaa"}
+    keyboardType="numeric"
+    value={form.phone}
+    onChangeText={(v) => handleChange("phone", v)}
+  />
 
-      {/* Mot de passe */}
-      <Text style={styles.label}>Mot de passe</Text>
-      <View style={styles.passwordBox}>
-        <TextInput
-          style={styles.passwordInput}
-          secureTextEntry={secure}
-          placeholder="Mot de passe"
-          placeholderTextColor="#aaa"
-          value={form.password}
-          onChangeText={(v) => handleChange("password", v)}
-        />
+  {/* Mot de passe */}
+  <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>Mot de passe</Text>
+  <View style={[styles.passwordBox, { backgroundColor: isDark ? "#111" : "#fff", borderColor: isDark ? "#444" : "#ddd" }]}>
+    <TextInput
+      style={[styles.passwordInput, { color: isDark ? "#fff" : "#000" }]}
+      secureTextEntry={secure}
+      placeholder="Mot de passe"
+      placeholderTextColor={isDark ? "#888" : "#aaa"}
+      value={form.password}
+      onChangeText={(v) => handleChange("password", v)}
+    />
+    <TouchableOpacity onPress={() => setSecure(!secure)}>
+      <Ionicons name={secure ? "eye-off" : "eye"} size={22} color={isDark ? "#ccc" : "#555"} />
+    </TouchableOpacity>
+  </View>
 
-        <TouchableOpacity onPress={() => setSecure(!secure)}>
-          <Ionicons name={secure ? "eye-off" : "eye"} size={22} color="#555" />
-        </TouchableOpacity>
-      </View>
+  {/* Bouton créer compte */}
+  <TouchableOpacity style={[styles.signupBtn, { backgroundColor: "#1043B1" }]} onPress={handleSignup}>
+    <Text style={styles.signupText}>Créer un compte</Text>
+  </TouchableOpacity>
 
-      {/* Bouton créer compte */}
-      <TouchableOpacity style={styles.signupBtn} onPress={handleSignup}>
-        <Text style={styles.signupText}>Créer un compte</Text>
-      </TouchableOpacity>
+  {/* Déjà un compte ? */}
+  <Text style={[styles.haveText, { color: isDark ? "#aaa" : "#666" }]}>Déjà membre ?</Text>
+  <TouchableOpacity onPress={() => router.push("/auth/login")}>
+    <Text style={[styles.loginLink, { color: isDark ? "#4EA3FF" : "#1043B1" }]}>Se connecter</Text>
+  </TouchableOpacity>
+</View>
 
-      {/* Déjà un compte ? */}
-      <Text style={styles.haveText}>Déjà membre ?</Text>
-
-      <TouchableOpacity onPress={() => router.push("/auth/login")}>
-        <Text style={styles.loginLink}>Se connecter</Text>
-      </TouchableOpacity>
-
-    </View>
   );
 }
 

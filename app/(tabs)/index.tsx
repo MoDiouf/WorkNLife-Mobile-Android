@@ -13,7 +13,7 @@ import { HelloWave } from "@/components/hello-wave";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { FeaturedCarousel } from "@/components/ui/FeaturedCarousel";
-
+import WorkNLifeMid from "@/assets/images/worknlife-Icon.svg";
 interface ServiceCardProps {
   image: ImageSourcePropType;
   title: string;
@@ -39,14 +39,44 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* HEADER */}
+
       <View style={[styles.header, { backgroundColor }]}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {/* Ligne principale du header */}
+        <View style={styles.headerRow}>
+          {/* Logo à gauche */}
+          <WorkNLifeMid width={40} height={40} />
+
+          {/* Centre (vide ou titre) */}
+          <ThemedText
+            type="title"
+            style={{
+              flex: 1,
+              textAlign: "center",
+              fontSize: 20,
+              color: textColor,
+            }}
+          >
+            {/* Tu peux mettre le titre ici si besoin */}
+          </ThemedText>
+
+          {/* Icônes à droite */}
+          <Ionicons name="notifications-outline" size={24} color={textColor} />
+        </View>
+
+        {/* Ligne secondaire : salut + wave */}
+        <View
+          style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}
+        >
           <ThemedText type="title" style={{ fontSize: 32, color: textColor }}>
             Bonjour !
           </ThemedText>
           <HelloWave />
         </View>
-        <ThemedText style={[styles.subtitle, { color: subtitleColor }]}>
+
+        {/* Sous-titre */}
+        <ThemedText
+          style={[styles.subtitle, { color: subtitleColor, marginTop: 4 }]}
+        >
           Que souhaitez-vous faire aujourd’hui ?
         </ThemedText>
 
@@ -54,7 +84,7 @@ export default function HomeScreen() {
         <View
           style={[
             styles.locationBadge,
-            { backgroundColor: isDark ? "#333" : "#000" },
+            { backgroundColor: isDark ? "#333" : "#000", marginTop: 6 },
           ]}
         >
           <Ionicons name="location" size={16} color="#fff" />
@@ -141,10 +171,7 @@ function ServiceCard({
 }: ServiceCardProps) {
   return (
     <TouchableOpacity
-      style={[
-        styles.card,
-        { backgroundColor: isDark ? "#222" : "#f8f8f8" },
-      ]}
+      style={[styles.card, { backgroundColor: isDark ? "#222" : "#f8f8f8" }]}
     >
       <Image source={image} style={styles.cardImage} contentFit="cover" />
       <View style={[styles.iconBadge, { backgroundColor: color }]}>
@@ -241,5 +268,11 @@ const styles = StyleSheet.create({
   },
   link: {
     color: "#1043b1",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
 });

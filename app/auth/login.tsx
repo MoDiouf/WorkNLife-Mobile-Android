@@ -1,80 +1,132 @@
 import { useState } from "react";
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  useColorScheme,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import WorkNLifeLogo from "@/assets/images/WorkNLife-OG.svg";
+import WorkNLifeLogoWhite from "@/assets/images/WorkNLife-OG-white.svg";
 
 export default function Login() {
   const router = useRouter();
   const [secure, setSecure] = useState(true);
+  const theme = useColorScheme(); // "dark" ou "light"
+  const isDark = theme === "dark";
 
   return (
-    <View style={styles.container}>
-
+    <View
+      style={[styles.container, { backgroundColor: isDark ? "#000" : "#fff" }]}
+    >
       {/* Logo */}
-      <View style={styles.logoBox}>
-        <Ionicons name="people" size={40} color="#fff" />
+      <View style={{ marginBottom: 0 }}>
+        {isDark ? <WorkNLifeLogoWhite width={280} height={150} />  : <WorkNLifeLogo width={280} height={150} />}
+        
       </View>
 
       {/* Titres */}
-      <Text style={styles.title}>WorkNLife</Text>
-      <Text style={styles.subtitle}>Accédez à votre compte</Text>
-      <Text style={styles.sectionTitle}>Connexion</Text>
+      <Text style={[styles.subtitle, { color: isDark ? "#fff" : "#666" }]}>
+        Accédez à votre compte
+      </Text>
+      <Text style={[styles.sectionTitle, { color: isDark ? "#fff" : "#000" }]}>
+        Connexion
+      </Text>
 
       {/* Champ Email */}
-      <Text style={styles.label}>Email ou nom d'utilisateur</Text>
+      <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>
+        Email ou nom d'utilisateur
+      </Text>
       <TextInput
-        style={styles.input}
+        style={[
+          styles.input,
+          {
+            backgroundColor: isDark ? "#111" : "#fff",
+            color: isDark ? "#fff" : "#000",
+            borderColor: isDark ? "#444" : "#ddd",
+          },
+        ]}
         placeholder="exemple@email.com"
-        placeholderTextColor="#aaa"
+        placeholderTextColor={isDark ? "#888" : "#aaa"}
       />
 
       {/* Champ Mot de passe */}
-      <Text style={styles.label}>Mot de passe</Text>
-      <View style={styles.passwordBox}>
+      <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>
+        Mot de passe
+      </Text>
+      <View
+        style={[
+          styles.passwordBox,
+          {
+            borderColor: isDark ? "#444" : "#ddd",
+            backgroundColor: isDark ? "#111" : "#fff",
+          },
+        ]}
+      >
         <TextInput
-          style={styles.passwordInput}
+          style={[styles.passwordInput, { color: isDark ? "#fff" : "#000" }]}
           secureTextEntry={secure}
           placeholder="Votre mot de passe"
-          placeholderTextColor="#aaa"
+          placeholderTextColor={isDark ? "#888" : "#aaa"}
         />
         <TouchableOpacity onPress={() => setSecure(!secure)}>
-          <Ionicons name={secure ? "eye-off" : "eye"} size={22} color="#555" />
+          <Ionicons
+            name={secure ? "eye-off" : "eye"}
+            size={22}
+            color={isDark ? "#ccc" : "#555"}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* Remember me + mot de passe oublié */}
+      {/* Checkbox */}
       <View style={styles.rowBetween}>
-        <TouchableOpacity style={styles.checkbox}></TouchableOpacity>
-        <Text style={styles.remember}>Se souvenir de moi</Text>
+        <TouchableOpacity
+          style={[
+            styles.checkbox,
+            { borderColor: isDark ? "#fff" : "#1043B1" },
+          ]}
+        ></TouchableOpacity>
+        <Text style={[styles.remember, { color: isDark ? "#fff" : "#000" }]}>
+          Se souvenir de moi
+        </Text>
 
-        <TouchableOpacity onPress={() => router.push('/')}>
-          <Text style={styles.forgot}>Mot de passe oublié ?</Text>
+        <TouchableOpacity onPress={() => router.push("/")}>
+          <Text
+            style={[styles.forgot, { color: isDark ? "#4EA3FF" : "#1043B1" }]}
+          >
+            Mot de passe oublié ?
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* Bouton Connexion */}
-      <TouchableOpacity 
-        style={styles.loginBtn}
+      <TouchableOpacity
+        style={[styles.loginBtn, { backgroundColor: "#1043B1" }]}
         onPress={() => router.replace("/(tabs)")}
       >
         <Text style={styles.loginText}>Connexion</Text>
       </TouchableOpacity>
 
       {/* Divider */}
-      <Text style={styles.newText}>Nouveau sur WorkNlife ?</Text>
+      <Text style={[styles.newText, { color: isDark ? "#aaa" : "#666" }]}>
+        Nouveau sur WorkNlife ?
+      </Text>
 
       {/* Bouton Créer un compte */}
-      <TouchableOpacity 
-        style={styles.signupBtn}
+      <TouchableOpacity
+        style={[
+          styles.signupBtn,
+          { backgroundColor: isDark ? "#222" : "#eee" },
+        ]}
         onPress={() => router.push("/auth/signup")}
       >
-        <Text style={styles.signupText}>Créer un compte</Text>
+        <Text style={[styles.signupText, { color: isDark ? "#fff" : "#000" }]}>
+          Créer un compte
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -86,7 +138,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 25,
     paddingTop: 90,
-    backgroundColor: "#fff"
+    backgroundColor: "#fff",
   },
 
   logoBox: {
@@ -96,30 +148,30 @@ const styles = StyleSheet.create({
     backgroundColor: "#1043B1",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 25
+    marginBottom: 25,
   },
 
   title: {
     fontSize: 30,
     fontWeight: "700",
-    marginBottom: 5
+    marginBottom: 5,
   },
 
   subtitle: {
     color: "#666",
-    marginBottom: 25
+    marginBottom: 25,
   },
 
   sectionTitle: {
     fontSize: 22,
     fontWeight: "600",
-    marginBottom: 25
+    marginBottom: 25,
   },
 
   label: {
     width: "100%",
     marginBottom: 8,
-    fontWeight: "500"
+    fontWeight: "500",
   },
 
   input: {
@@ -129,7 +181,7 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 10,
     paddingHorizontal: 15,
-    marginBottom: 15
+    marginBottom: 15,
   },
 
   passwordBox: {
@@ -142,18 +194,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 15
+    marginBottom: 15,
   },
 
   passwordInput: {
-    flex: 1
+    flex: 1,
   },
 
   rowBetween: {
     flexDirection: "row",
     width: "100%",
     alignItems: "center",
-    marginBottom: 20
+    marginBottom: 20,
   },
 
   checkbox: {
@@ -162,15 +214,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1043B1",
     borderRadius: 5,
-    marginRight: 8
+    marginRight: 8,
   },
 
   remember: {
-    flex: 1
+    flex: 1,
   },
 
   forgot: {
-    color: "#1043B1"
+    color: "#1043B1",
   },
 
   loginBtn: {
@@ -180,18 +232,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20
+    marginBottom: 20,
   },
 
   loginText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "600"
+    fontWeight: "600",
   },
 
   newText: {
     marginBottom: 10,
-    color: "#666"
+    color: "#666",
   },
 
   signupBtn: {
@@ -200,11 +252,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#eee",
     borderRadius: 10,
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
   },
 
   signupText: {
     fontSize: 16,
-    fontWeight: "600"
-  }
+    fontWeight: "600",
+  },
 });
