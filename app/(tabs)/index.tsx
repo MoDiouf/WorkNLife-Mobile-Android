@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   TouchableOpacity,
@@ -10,10 +10,11 @@ import {
 import { Image } from "expo-image";
 import { ThemedText } from "@/components/themed-text";
 import { HelloWave } from "@/components/hello-wave";
-import { Link } from "expo-router";
+import { Link, useNavigation } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { FeaturedCarousel } from "@/components/ui/FeaturedCarousel";
 import WorkNLifeMid from "@/assets/images/worknlife-Icon.svg";
+
 interface ServiceCardProps {
   image: ImageSourcePropType;
   title: string;
@@ -31,132 +32,123 @@ export default function HomeScreen() {
   const backgroundColor = isDark ? "#000" : "#fff";
   const textColor = isDark ? "#fff" : "#000";
   const subtitleColor = isDark ? "#AAA" : "#555";
-
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor }}
-      contentContainerStyle={{ paddingBottom: 20 }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* HEADER */}
+    <View style={{ flex: 1, backgroundColor }}>
+      {/* HEADER ABSOLUTE */}
+      <View style={[styles.headerRow, { backgroundColor }]}>
+        <Image
+          source={
+            isDark
+              ? require("../../assets/images/Horizontal-black.png")
+              : require("../../assets/images/Horizontal-White.png")
+          }
+          style={{ width: 170, height: 50,resizeMode:"cover" }}
+        />
 
-      <View style={[styles.header, { backgroundColor }]}>
-        {/* Ligne principale du header */}
-        <View style={styles.headerRow}>
-          {/* Logo à gauche */}
-          <WorkNLifeMid width={40} height={40} />
+        <Ionicons name="notifications-outline" size={24} color={textColor} />
+      </View>
 
-          {/* Centre (vide ou titre) */}
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: 120, 
+          paddingBottom: 20,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* CONTENU PRINCIPAL */}
+        <View style={[styles.headerContent, { backgroundColor }]}>
+          <View style={styles.welcomeSection}>
+            <ThemedText type="title" style={{ fontSize: 32, color: textColor }}>
+              Bonjour !
+            </ThemedText>
+            <HelloWave />
+          </View>
+
           <ThemedText
-            type="title"
-            style={{
-              flex: 1,
-              textAlign: "center",
-              fontSize: 20,
-              color: textColor,
-            }}
+            style={[styles.subtitle, { color: subtitleColor, marginTop: 4 }]}
           >
-            {/* Tu peux mettre le titre ici si besoin */}
+            Que souhaitez-vous faire aujourd'hui ?
           </ThemedText>
 
-          {/* Icônes à droite */}
-          <Ionicons name="notifications-outline" size={24} color={textColor} />
+          <View
+            style={[
+              styles.locationBadge,
+              { backgroundColor: isDark ? "#333" : "#000", marginTop: 6 },
+            ]}
+          >
+            <Ionicons name="location" size={16} color="#fff" />
+            <ThemedText style={{ color: "#fff" }}>Paris, France</ThemedText>
+          </View>
         </View>
 
-        {/* Ligne secondaire : salut + wave */}
-        <View
-          style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}
-        >
-          <ThemedText type="title" style={{ fontSize: 32, color: textColor }}>
-            Bonjour !
-          </ThemedText>
-          <HelloWave />
-        </View>
-
-        {/* Sous-titre */}
-        <ThemedText
-          style={[styles.subtitle, { color: subtitleColor, marginTop: 4 }]}
-        >
-          Que souhaitez-vous faire aujourd’hui ?
-        </ThemedText>
-
-        {/* Location Badge */}
-        <View
-          style={[
-            styles.locationBadge,
-            { backgroundColor: isDark ? "#333" : "#000", marginTop: 6 },
-          ]}
-        >
-          <Ionicons name="location" size={16} color="#fff" />
-          <ThemedText style={{ color: "#fff" }}>Paris, France</ThemedText>
-        </View>
-      </View>
-
-      {/* SERVICES */}
-      <View style={styles.section}>
-        <ThemedText
-          type="subtitle"
-          style={[styles.sectionTitle, { color: textColor }]}
-        >
-          Nos Services
-        </ThemedText>
-
-        <View style={styles.grid}>
-          <ServiceCard
-            image={require("./../../assets/images/convoiturage.jpeg")}
-            title="Covoiturage"
-            subtitle="Partagez vos trajets"
-            icon="car"
-            color="#3ABEFF"
-            description="Économique et écologique"
-            isDark={isDark}
-          />
-          <ServiceCard
-            image={require("@/assets/images/commande.jpeg")}
-            title="Commandes"
-            subtitle="Livraison de repas"
-            icon="fast-food"
-            color="#FFB800"
-            description="Délicieux à votre porte"
-            isDark={isDark}
-          />
-          <ServiceCard
-            image={require("@/assets/images/commade.jpeg")}
-            title="Healthy"
-            subtitle="Bien-être & santé"
-            icon="heart"
-            color="#00E18C"
-            description="Prenez soin de vous"
-            isDark={isDark}
-          />
-          <ServiceCard
-            image={require("@/assets/images/loisir.webp")}
-            title="Loisirs"
-            subtitle="Divertissement"
-            icon="game-controller"
-            color="#B07CFF"
-            description="Détendez-vous et amusez-vous"
-            isDark={isDark}
-          />
-        </View>
-      </View>
-
-      {/* Featured */}
-      <View style={styles.section}>
-        <View style={styles.rowBetween}>
+        {/* SERVICES */}
+        <View style={styles.section}>
           <ThemedText
             type="subtitle"
             style={[styles.sectionTitle, { color: textColor }]}
           >
-            À la une
+            Nos Services
           </ThemedText>
-          <Link href="/">
-            <ThemedText style={styles.link}>Voir tout →</ThemedText>
-          </Link>
+
+          <View style={styles.grid}>
+            <ServiceCard
+              image={require("./../../assets/images/convoiturage.jpeg")}
+              title="Covoiturage"
+              subtitle="Partagez vos trajets"
+              icon="car"
+              color="#3ABEFF"
+              description="Économique et écologique"
+              isDark={isDark}
+            />
+            <ServiceCard
+              image={require("@/assets/images/commande.jpeg")}
+              title="Commandes"
+              subtitle="Livraison de repas"
+              icon="fast-food"
+              color="#FFB800"
+              description="Délicieux à votre porte"
+              isDark={isDark}
+            />
+            <ServiceCard
+              image={require("@/assets/images/commade.jpeg")}
+              title="Healthy"
+              subtitle="Bien-être & santé"
+              icon="heart"
+              color="#00E18C"
+              description="Prenez soin de vous"
+              isDark={isDark}
+            />
+            <ServiceCard
+              image={require("@/assets/images/loisir.webp")}
+              title="Loisirs"
+              subtitle="Divertissement"
+              icon="game-controller"
+              color="#B07CFF"
+              description="Détendez-vous et amusez-vous"
+              isDark={isDark}
+            />
+          </View>
         </View>
-        <FeaturedCarousel />
-      </View>
-    </ScrollView>
+
+        {/* Featured */}
+        <View style={styles.section}>
+          <View style={styles.rowBetween}>
+            <ThemedText
+              type="subtitle"
+              style={[styles.sectionTitle, { color: textColor }]}
+            >
+              À la une
+            </ThemedText>
+            <Link href="/">
+              <ThemedText style={styles.link}>Voir tout →</ThemedText>
+            </Link>
+          </View>
+          <FeaturedCarousel />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -199,11 +191,29 @@ function ServiceCard({
 }
 
 const styles = StyleSheet.create({
-  header: {
+  headerRow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 60, 
+    height: 120, 
+  },
+  headerContent: {
     gap: 8,
     marginBottom: 20,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 0,
+  },
+  welcomeSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
   },
   subtitle: {
     fontSize: 14,
@@ -268,11 +278,5 @@ const styles = StyleSheet.create({
   },
   link: {
     color: "#1043b1",
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
   },
 });
