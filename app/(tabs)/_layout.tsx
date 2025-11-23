@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { HapticTab } from "@/components/haptic-tab";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import CustomTabButton from "@/components/CustomTabButton";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -22,7 +23,7 @@ export default function TabLayout() {
           elevation: 5,
           height: 80,
         },
-        tabBarButton:undefined,
+        tabBarButton:(props) => <CustomTabButton {...props} />,
       }}
     >
       <Tabs.Screen

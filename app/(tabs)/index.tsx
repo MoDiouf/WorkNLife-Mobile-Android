@@ -203,6 +203,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60, 
     height: 120, 
+    borderBottomWidth:.5,
+    borderBottomColor:"#d1d1d1ff"
   },
   headerContent: {
     gap: 8,
