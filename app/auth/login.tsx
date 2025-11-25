@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,24 +12,75 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import WorkNLifeLogo from "@/assets/images/WorkNLife-OG.svg";
 import WorkNLifeLogoWhite from "@/assets/images/WorkNLife-OG-white.svg";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Login() {
   const router = useRouter();
   const [secure, setSecure] = useState(true);
-  const theme = useColorScheme(); // "dark" ou "light"
+  const theme = useColorScheme();
   const isDark = theme === "dark";
+
+  useEffect(() => {
+    const checkLogin = async () => {
+      const logged = await AsyncStorage.getItem("isLogged");
+      if (logged === "true") {
+        router.replace("/(tabs)");
+      }
+    };
+
+    checkLogin();
+  }, []);
+
+  const [userEmail, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async () => {
+    if (!userEmail || !password) {
+      alert("Veuillez remplir tous les champs");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://192.168.1.34:3000/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: userEmail,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Identifiants incorrects");
+        return;
+      }
+
+      await AsyncStorage.setItem("isLogged", "true");
+      await AsyncStorage.setItem("user", JSON.stringify(data));
+
+      router.replace("/(tabs)");
+    } catch (error) {
+      console.log(error);
+      alert("Erreur réseau");
+    }
+  };
 
   return (
     <View
       style={[styles.container, { backgroundColor: isDark ? "#000" : "#fff" }]}
     >
-      {/* Logo */}
       <View style={{ marginBottom: 0 }}>
-        {isDark ? <WorkNLifeLogoWhite width={280} height={150} />  : <WorkNLifeLogo width={280} height={150} />}
-        
+        {isDark ? (
+          <WorkNLifeLogoWhite width={280} height={150} />
+        ) : (
+          <WorkNLifeLogo width={280} height={150} />
+        )}
       </View>
 
-      {/* Titres */}
       <Text style={[styles.subtitle, { color: isDark ? "#fff" : "#666" }]}>
         Accédez à votre compte
       </Text>
@@ -37,7 +88,6 @@ export default function Login() {
         Connexion
       </Text>
 
-      {/* Champ Email */}
       <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>
         Email ou nom d'utilisateur
       </Text>
@@ -52,9 +102,10 @@ export default function Login() {
         ]}
         placeholder="exemple@email.com"
         placeholderTextColor={isDark ? "#888" : "#aaa"}
+        value={userEmail}
+        onChangeText={setEmail}
       />
 
-      {/* Champ Mot de passe */}
       <Text style={[styles.label, { color: isDark ? "#fff" : "#000" }]}>
         Mot de passe
       </Text>
@@ -72,6 +123,8 @@ export default function Login() {
           secureTextEntry={secure}
           placeholder="Votre mot de passe"
           placeholderTextColor={isDark ? "#888" : "#aaa"}
+          value={password}
+          onChangeText={setPassword}
         />
         <TouchableOpacity onPress={() => setSecure(!secure)}>
           <Ionicons
@@ -82,7 +135,6 @@ export default function Login() {
         </TouchableOpacity>
       </View>
 
-      {/* Checkbox */}
       <View style={styles.rowBetween}>
         <TouchableOpacity
           style={[
@@ -103,20 +155,17 @@ export default function Login() {
         </TouchableOpacity>
       </View>
 
-      {/* Bouton Connexion */}
       <TouchableOpacity
         style={[styles.loginBtn, { backgroundColor: "#1043B1" }]}
-        onPress={() => router.replace("/(tabs)")}
+        onPress={handleLogin}
       >
         <Text style={styles.loginText}>Connexion</Text>
       </TouchableOpacity>
 
-      {/* Divider */}
       <Text style={[styles.newText, { color: isDark ? "#aaa" : "#666" }]}>
         Nouveau sur WorkNlife ?
       </Text>
 
-      {/* Bouton Créer un compte */}
       <TouchableOpacity
         style={[
           styles.signupBtn,

@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import TimelineBackground from "@/components/AnimatedBackground";
 import WorkNLifeLogo from "@/assets/images/WorkNLife-OG.svg";
 import WorkNLifeLogoWhite from "@/assets/images/WorkNLife-OG-white.svg";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Signup() {
   const router = useRouter();
@@ -30,14 +31,35 @@ const isDark = theme === "dark";
     setForm({ ...form, [key]: value });
   };
 
-  const handleSignup = () => {
-    console.log("Signup data :", form);
+  const handleSignup = async () => {
+  console.log("Signup data :", form);
 
-    // 👉 Ici tu ajouteras ta requête API
-    // fetch("https://tonapi.com/signup", { ... })
+  try {
+    const response = await fetch("http://192.168.1.34:3000/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        full_name: form.full_name,
+        email: form.email,
+        password: form.password,
+        phone: form.phone
+      }),
+    });
 
-    router.replace("/(tabs)");
-  };
+    if (!response.ok) {
+      console.log("Erreur backend :", await response.text());
+      return;
+    }
+    AsyncStorage.setItem('user', await response.json());
+
+    router.replace("/auth/login");
+  } catch (err) {
+    console.error("Erreur réseau :", err);
+  }
+};
+
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? "#000" : "#fff" }]}>
