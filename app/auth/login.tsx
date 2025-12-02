@@ -20,17 +20,6 @@ export default function Login() {
   const theme = useColorScheme();
   const isDark = theme === "dark";
 
-  useEffect(() => {
-    const checkLogin = async () => {
-      const logged = await AsyncStorage.getItem("isLogged");
-      if (logged === "true") {
-        router.replace("/(tabs)");
-      }
-    };
-
-    checkLogin();
-  }, []);
-
   const [userEmail, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -41,7 +30,7 @@ export default function Login() {
     }
 
     try {
-      const response = await fetch("http://192.168.1.34:3000/auth/login", {
+      const response = await fetch("http://192.168.1.18:3000/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,9 +47,10 @@ export default function Login() {
         alert(data.message || "Identifiants incorrects");
         return;
       }
+      console.log("Reopnse log", data);
 
       await AsyncStorage.setItem("isLogged", "true");
-      await AsyncStorage.setItem("user", JSON.stringify(data));
+      await AsyncStorage.setItem("mobile_token", data.mobile_token);
 
       router.replace("/(tabs)");
     } catch (error) {

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { View, StyleSheet, useColorScheme, Animated } from "react-native";
 import WorkNLifeLogo from "@/assets/images/WorkNLife-OG.svg";
 import WorkNLifeLogoWhite from "@/assets/images/WorkNLife-OG-white.svg";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Splash() {
   const router = useRouter();
@@ -13,7 +14,6 @@ export default function Splash() {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
 
-  const isLoggedIn = false; // à remplacer par ton vrai état
 
   useEffect(() => {
     Animated.parallel([
@@ -27,10 +27,14 @@ export default function Splash() {
         friction: 4,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setTimeout(() => {
-        if (isLoggedIn) router.replace("/(tabs)");
-        else router.replace("/auth/login");
+    ]).start(async() => {
+      setTimeout(async() => {
+      const logged = await AsyncStorage.getItem("isLogged");
+      if (logged === "true") {
+        router.replace("/(tabs)");
+      }else{
+        router.replace("/auth/login");
+      }
       }, 600);
     });
   }, []);

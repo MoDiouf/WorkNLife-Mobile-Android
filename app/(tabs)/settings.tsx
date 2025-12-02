@@ -1,11 +1,22 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, useColorScheme } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 
 export default function Settings() {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
+  const logout = async () => {
+    // 1. Supprimer les tokens
+    await AsyncStorage.removeItem("mobile_token");
+    await AsyncStorage.removeItem("isLogged");
+    await AsyncStorage.removeItem("user");
+
+    // 2. Redirection vers login
+    router.replace("/auth/login");
+  };
   return (
     <View style={[styles.container, { backgroundColor: isDark ? "#0d0d0d" : "#fff" }]}>
       
@@ -33,7 +44,7 @@ export default function Settings() {
       </View>
 
       {/* Déconnexion */}
-      <TouchableOpacity style={styles.logoutButton}>
+      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
         <Ionicons name="log-out-outline" size={20} color="#fff" />
         <Text style={styles.logoutText}>Déconnexion</Text>
       </TouchableOpacity>

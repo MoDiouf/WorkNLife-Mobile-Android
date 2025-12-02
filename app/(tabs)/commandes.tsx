@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,11 +10,36 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Repas() {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
 
+  useEffect(() => {
+    const fetchMenus = async () => {
+      try {
+        const token = await AsyncStorage.getItem("mobile_token");
+
+        const response = await fetch("http://192.168.1.18:3000/menus/allmenus", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+        console.log("resultats",data);
+        
+
+      } catch (error) {
+        console.log("Erreur fetch menu:", error);
+      }
+    };
+
+    fetchMenus(); // ⬅️ la requête s’exécute quand tu arrives sur la page
+  }, []);
   const allRestaurants = [
     {
       name: "Chez Mamadou",
