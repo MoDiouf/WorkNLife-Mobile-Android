@@ -9,11 +9,14 @@ import {
   Image,
   useColorScheme,
   Modal,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
+
+const { width } = Dimensions.get('window');
 
 export default function Convoiturage() {
   const scheme = useColorScheme();
@@ -26,6 +29,7 @@ export default function Convoiturage() {
   const [hasCreatePermission, setHasCreatePermission] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const fetchCovoiturage = async () => {
@@ -46,7 +50,6 @@ export default function Convoiturage() {
         }
       } catch (error) {
         console.log("Erreur fetch carpool:", error);
-      } finally {
       }
     };
 
@@ -77,18 +80,84 @@ export default function Convoiturage() {
       const data = await response.json();
       console.log("Retour: ", data);
 
-      // ✅ Supposons que le backend renvoie { allowed: true }
       if (data.allowed === true) {
         setHasCreatePermission(true);
-        setActiveTab("creer"); // ✅ autorisé
+        setActiveTab("creer");
       } else {
         setShowVerifyModal(true);
       }
     } catch (error) {
       console.log("Erreur permission:", error);
-      alert("❌ Accès refusé. Contactez l’administrateur.");
+      alert("❌ Accès refusé. Contactez l'administrateur.");
     } finally {
       setCheckingPermission(false);
+    }
+  };
+
+  const handleDocumentPick = async (type: 'cni' | 'permis') => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const file = result.assets[0];
+        setSelectedDoc({
+          ...file,
+          type: type,
+          label: type === 'cni' ? 'Carte CNI' : 'Permis de conduire'
+        });
+      }
+    } catch (err) {
+      console.log("Erreur:", err);
+      alert("Erreur lors de la sélection du document");
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedDoc) {
+      alert("Veuillez sélectionner un document");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const token = await AsyncStorage.getItem("mobile_token");
+      
+      const formData = new FormData();
+      formData.append('document_type', selectedDoc.type);
+      formData.append('file', {
+        uri: selectedDoc.uri,
+        type: selectedDoc.mimeType || 'application/octet-stream',
+        name: selectedDoc.name,
+      }as any);
+
+      const response = await fetch(
+        "http://192.168.1.18:3000/carpools/upload-verification",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (response.ok) {
+        alert(`✅ ${selectedDoc.label} envoyé avec succès !\nNous vérifierons votre document sous 24h.`);
+        setShowVerifyModal(false);
+        setSelectedDoc(null);
+      } else {
+        const errorText = await response.text();
+        console.error("Erreur serveur:", errorText);
+        alert("❌ Erreur lors de l'envoi du document");
+      }
+    } catch (err) {
+      console.log(err);
+      alert("❌ Erreur réseau");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -96,7 +165,7 @@ export default function Convoiturage() {
     {
       from: "Paris",
       to: "Lyon",
-      date: "Aujourd’hui",
+      date: "Aujourd'hui",
       time: "14h30",
       duration: "4h30",
       price: "25€",
@@ -154,6 +223,7 @@ export default function Convoiturage() {
     tagBg: isDark ? "rgba(74,222,128,0.15)" : "rgba(74,222,128,0.20)",
     divider: isDark ? "#2f2f2f" : "#e5e5e5",
   };
+
   return (
     <ScrollView
       style={[
@@ -162,397 +232,342 @@ export default function Convoiturage() {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      {/* Modal de vérification */}
       <Modal
-  animationType="slide"
-  transparent={true}
-  visible={showVerifyModal}
-  onRequestClose={() => setShowVerifyModal(false)}
->
-  <View style={styles.modalOverlay}>
-    <View style={[
-      styles.modalContentt,
-      { backgroundColor: isDark ? "#1a1a1a" : "#fff" }
-    ]}>
-      {/* En-tête */}
-      <View style={styles.modalHeader}>
-        <Text style={[
-          styles.modalTitlee,
-          { color: isDark ? "#fff" : "#000" }
-        ]}>
-          Vérification du profil
-        </Text>
-        <Text style={[
-          styles.modalSubtitle,
-          { color: isDark ? "#ccc" : "#666" }
-        ]}>
-          Pour créer des trajets, vous devez vérifier votre identité
-        </Text>
-      </View>
-
-      {/* Documents requis */}
-      <View style={styles.documentsSection}>
-        <Text style={[
-          styles.sectionTitle,
-          { color: isDark ? "#fff" : "#000" }
-        ]}>
-          Documents traités :
-        </Text>
-        
-        <View style={styles.documentItem}>
-          <View style={styles.documentIconContainer}>
-            <Ionicons name="card" size={20} color="#1041b3" />
-          </View>
-          <View style={styles.documentInfo}>
-            <Text style={[
-              styles.documentTitle,
-              { color: isDark ? "#fff" : "#000" }
-            ]}>
-              Carte Nationale d'Identité (CNI)
-            </Text>
-            <Text style={[
-              styles.documentDesc,
-              { color: isDark ? "#aaa" : "#666" }
-            ]}>
-              Recto et verso bien visibles
-            </Text>
-          </View>
-          <View style={[
-            styles.documentStatus,
-            { backgroundColor: selectedDoc?.type === 'cni' ? '#4ade80' : '#e5e5e5' }
-          ]}>
-            <Text style={styles.documentStatusText}>
-              {selectedDoc?.type === 'cni' ? '✓' : '1'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.documentItem}>
-          <View style={styles.documentIconContainer}>
-            <Ionicons name="car" size={20} color="#1041b3" />
-          </View>
-          <View style={styles.documentInfo}>
-            <Text style={[
-              styles.documentTitle,
-              { color: isDark ? "#fff" : "#000" }
-            ]}>
-              Permis de conduire
-            </Text>
-            <Text style={[
-              styles.documentDesc,
-              { color: isDark ? "#aaa" : "#666" }
-            ]}>
-              Recto et verso bien visibles
-            </Text>
-          </View>
-          <View style={[
-            styles.documentStatus,
-            { backgroundColor: selectedDoc?.type === 'permis' ? '#4ade80' : '#e5e5e5' }
-          ]}>
-            <Text style={styles.documentStatusText}>
-              {selectedDoc?.type === 'permis' ? '✓' : '2'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Sélection du document */}
-      <View style={styles.selectionSection}>
-        <Text style={[
-          styles.sectionTitle,
-          { color: isDark ? "#fff" : "#000", marginBottom: 12 }
-        ]}>
-          Choisir un document à envoyer :
-        </Text>
-
-        <View style={styles.documentButtons}>
-          <TouchableOpacity
-            style={[
-              styles.documentButton,
-              { 
-                backgroundColor: selectedDoc?.type === 'cni' 
-                  ? 'rgba(16, 65, 179, 0.2)' 
-                  : isDark ? "#2a2a2a" : "#f5f5f5",
-                borderColor: selectedDoc?.type === 'cni' ? '#1041b3' : 'transparent'
-              }
-            ]}
-            onPress={async () => {
-              try {
-                const result = await DocumentPicker.getDocumentAsync({
-                  type: ["application/pdf"],
-                  copyToCacheDirectory: true,
-                });
-
-                if (!result.canceled && result.assets.length > 0) {
-                  const file = result.assets[0];
-                  setSelectedDoc({
-                    ...file,
-                    type: 'cni',
-                    label: 'Carte CNI'
-                  });
-                }
-              } catch (err) {
-                console.log("Erreur:", err);
-              }
-            }}
+        animationType="slide"
+        transparent={true}
+        visible={showVerifyModal}
+        onRequestClose={() => setShowVerifyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView 
+            style={styles.modalScroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalScrollContent}
           >
             <View style={[
-              styles.documentButtonIcon,
-              { backgroundColor: isDark ? '#1a1a1a' : '#fff' }
+              styles.modalContent,
+              { backgroundColor: isDark ? "#1a1a1a" : "#fff" }
             ]}>
-              <Ionicons name="card" size={24} color="#1041b3" />
-            </View>
-            <Text style={[
-              styles.documentButtonText,
-              { color: isDark ? "#fff" : "#000" }
-            ]}>
-              Carte CNI
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.documentButton,
-              { 
-                backgroundColor: selectedDoc?.type === 'permis' 
-                  ? 'rgba(16, 65, 179, 0.2)' 
-                  : isDark ? "#2a2a2a" : "#f5f5f5",
-                borderColor: selectedDoc?.type === 'permis' ? '#1041b3' : 'transparent'
-              }
-            ]}
-            onPress={async () => {
-              try {
-                const result = await DocumentPicker.getDocumentAsync({
-                  type: ["application/pdf"],
-                  copyToCacheDirectory: true,
-                });
-
-                if (!result.canceled && result.assets.length > 0) {
-                  const file = result.assets[0];
-                  setSelectedDoc({
-                    ...file,
-                    type: 'permis',
-                    label: 'Permis de conduire'
-                  });
-                }
-              } catch (err) {
-                console.log("Erreur:", err);
-              }
-            }}
-          >
-            <View style={[
-              styles.documentButtonIcon,
-              { backgroundColor: isDark ? '#1a1a1a' : '#fff' }
-            ]}>
-              <Ionicons name="car" size={24} color="#1041b3" />
-            </View>
-            <Text style={[
-              styles.documentButtonText,
-              { color: isDark ? "#fff" : "#000" }
-            ]}>
-              Permis
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Liste des documents sélectionnés */}
-      {selectedDoc && (
-        <View style={styles.selectedDocumentsSection}>
-          <Text style={[
-            styles.sectionTitle,
-            { color: isDark ? "#fff" : "#000", marginBottom: 10 }
-          ]}>
-            Document sélectionné :
-          </Text>
-          
-          <View style={[
-            styles.documentCard,
-            { backgroundColor: isDark ? "#2a2a2a" : "#f8f8f8" }
-          ]}>
-            <View style={styles.documentCardHeader}>
-              <View style={styles.documentCardIcon}>
-                <Ionicons 
-                  name={selectedDoc.type === 'cni' ? 'card' : 'car'} 
-                  size={24} 
-                  color="#1041b3" 
-                />
-              </View>
-              <View style={styles.documentCardInfo}>
-                <View>
-                  <Text style={[
-                    styles.documentCardTitle,
-                    { color: isDark ? "#fff" : "#000" }
-                  ]}>
-                    {selectedDoc.label}
-                  </Text>
-                  <Text style={[
-                    styles.documentCardName,
-                    { color: isDark ? "#aaa" : "#666" }
-                  ]} numberOfLines={1}>
-                    {selectedDoc.name}
-                  </Text>
-                </View>
+              {/* En-tête */}
+              <View style={styles.modalHeader}>
                 <Text style={[
-                  styles.documentCardSize,
-                  { color: isDark ? "#888" : "#888" }
+                  styles.modalTitle,
+                  { color: isDark ? "#fff" : "#000" }
                 ]}>
-                  {(selectedDoc.size / 1024).toFixed(1)} KB
+                  Vérification du profil
+                </Text>
+                <Text style={[
+                  styles.modalSubtitle,
+                  { color: isDark ? "#ccc" : "#666" }
+                ]}>
+                  Pour créer des trajets, vous devez vérifier votre identité
                 </Text>
               </View>
-              <TouchableOpacity 
-                onPress={() => setSelectedDoc(null)}
-                style={styles.removeButton}
-              >
-                <Ionicons name="close-circle" size={24} color="#ef4444" />
-              </TouchableOpacity>
+
+              {/* Documents requis */}
+              <View style={styles.documentsSection}>
+                <Text style={[
+                  styles.sectionTitle,
+                  { color: isDark ? "#fff" : "#000" }
+                ]}>
+                  Documents traités :
+                </Text>
+                
+                <View style={styles.documentItem}>
+                  <View style={styles.documentIconContainer}>
+                    <Ionicons name="card" size={20} color="#1041b3" />
+                  </View>
+                  <View style={styles.documentInfo}>
+                    <Text style={[
+                      styles.documentTitle,
+                      { color: isDark ? "#fff" : "#000" }
+                    ]}>
+                      Carte Nationale d'Identité (CNI)
+                    </Text>
+                    <Text style={[
+                      styles.documentDesc,
+                      { color: isDark ? "#aaa" : "#666" }
+                    ]}>
+                      Recto et verso bien visibles
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.documentStatus,
+                    { backgroundColor: selectedDoc?.type === 'cni' ? '#4ade80' : '#e5e5e5' }
+                  ]}>
+                    <Text style={styles.documentStatusText}>
+                      {selectedDoc?.type === 'cni' ? '✓' : '1'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.documentItem}>
+                  <View style={styles.documentIconContainer}>
+                    <Ionicons name="car" size={20} color="#1041b3" />
+                  </View>
+                  <View style={styles.documentInfo}>
+                    <Text style={[
+                      styles.documentTitle,
+                      { color: isDark ? "#fff" : "#000" }
+                    ]}>
+                      Permis de conduire
+                    </Text>
+                    <Text style={[
+                      styles.documentDesc,
+                      { color: isDark ? "#aaa" : "#666" }
+                    ]}>
+                      Recto et verso bien visibles
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.documentStatus,
+                    { backgroundColor: selectedDoc?.type === 'permis' ? '#4ade80' : '#e5e5e5' }
+                  ]}>
+                    <Text style={styles.documentStatusText}>
+                      {selectedDoc?.type === 'permis' ? '✓' : '2'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Sélection du document */}
+              <View style={styles.selectionSection}>
+                <Text style={[
+                  styles.sectionTitle,
+                  { color: isDark ? "#fff" : "#000", marginBottom: 12 }
+                ]}>
+                  Choisir un document à envoyer :
+                </Text>
+
+                <View style={styles.documentButtonsContainer}>
+                  <View style={styles.documentButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.documentButton,
+                        { 
+                          backgroundColor: selectedDoc?.type === 'cni' 
+                            ? 'rgba(16, 65, 179, 0.2)' 
+                            : isDark ? "#2a2a2a" : "#f5f5f5",
+                          borderColor: selectedDoc?.type === 'cni' ? '#1041b3' : 'transparent'
+                        }
+                      ]}
+                      onPress={() => handleDocumentPick('cni')}
+                    >
+                      <View style={[
+                        styles.documentButtonIcon,
+                        { backgroundColor: isDark ? '#1a1a1a' : '#fff' }
+                      ]}>
+                        <Ionicons name="card" size={24} color="#1041b3" />
+                      </View>
+                      <Text style={[
+                        styles.documentButtonText,
+                        { color: isDark ? "#fff" : "#000" }
+                      ]}>
+                        Carte CNI
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.documentButton,
+                        { 
+                          backgroundColor: selectedDoc?.type === 'permis' 
+                            ? 'rgba(16, 65, 179, 0.2)' 
+                            : isDark ? "#2a2a2a" : "#f5f5f5",
+                          borderColor: selectedDoc?.type === 'permis' ? '#1041b3' : 'transparent'
+                        }
+                      ]}
+                      onPress={() => handleDocumentPick('permis')}
+                    >
+                      <View style={[
+                        styles.documentButtonIcon,
+                        { backgroundColor: isDark ? '#1a1a1a' : '#fff' }
+                      ]}>
+                        <Ionicons name="car" size={24} color="#1041b3" />
+                      </View>
+                      <Text style={[
+                        styles.documentButtonText,
+                        { color: isDark ? "#fff" : "#000" }
+                      ]}>
+                        Permis
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* Document sélectionné */}
+              {selectedDoc && (
+                <View style={styles.selectedDocumentsSection}>
+                  <Text style={[
+                    styles.sectionTitle,
+                    { color: isDark ? "#fff" : "#000", marginBottom: 10 }
+                  ]}>
+                    Document sélectionné :
+                  </Text>
+                  
+                  <View style={[
+                    styles.documentCard,
+                    { backgroundColor: isDark ? "#2a2a2a" : "#f8f8f8" }
+                  ]}>
+                    <View style={styles.documentCardHeader}>
+                      <View style={styles.documentCardIcon}>
+                        <Ionicons 
+                          name={selectedDoc.type === 'cni' ? 'card' : 'car'} 
+                          size={24} 
+                          color="#1041b3" 
+                        />
+                      </View>
+                      <View style={styles.documentCardInfo}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[
+                            styles.documentCardTitle,
+                            { color: isDark ? "#fff" : "#000" }
+                          ]}>
+                            {selectedDoc.label}
+                          </Text>
+                          <Text style={[
+                            styles.documentCardName,
+                            { color: isDark ? "#aaa" : "#666" }
+                          ]} numberOfLines={1}>
+                            {selectedDoc.name}
+                          </Text>
+                        </View>
+                        <Text style={[
+                          styles.documentCardSize,
+                          { color: isDark ? "#888" : "#888" }
+                        ]}>
+                          {(selectedDoc.size / 1024).toFixed(1)} KB
+                        </Text>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => setSelectedDoc(null)}
+                        style={styles.removeButton}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Statut des documents */}
+              <View style={styles.documentsList}>
+                <Text style={[
+                  styles.sectionTitle,
+                  { color: isDark ? "#fff" : "#000", marginBottom: 10 }
+                ]}>
+                  Documents à envoyer :
+                </Text>
+                
+                <View style={styles.documentsStatus}>
+                  <View style={styles.statusItem}>
+                    <View style={[
+                      styles.statusIndicator,
+                      { backgroundColor: selectedDoc?.type === 'cni' ? '#4ade80' : '#e5e5e5' }
+                    ]}>
+                      <Text style={styles.statusText}>
+                        {selectedDoc?.type === 'cni' ? '✓' : '1'}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.statusLabel,
+                      { color: isDark ? "#fff" : "#000" }
+                    ]}>
+                      CNI {selectedDoc?.type === 'cni' ? '(Sélectionné)' : '(Manquant)'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.statusItem}>
+                    <View style={[
+                      styles.statusIndicator,
+                      { backgroundColor: selectedDoc?.type === 'permis' ? '#4ade80' : '#e5e5e5' }
+                    ]}>
+                      <Text style={styles.statusText}>
+                        {selectedDoc?.type === 'permis' ? '✓' : '2'}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.statusLabel,
+                      { color: isDark ? "#fff" : "#000" }
+                    ]}>
+                      Permis {selectedDoc?.type === 'permis' ? '(Sélectionné)' : '(Manquant)'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Boutons d'action */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    styles.primaryButton,
+                    { opacity: !selectedDoc || uploading ? 0.6 : 1 }
+                  ]}
+                  onPress={handleUpload}
+                  disabled={!selectedDoc || uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <Ionicons name="refresh" size={20} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={styles.primaryButtonText}>
+                        Envoi en cours...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={styles.primaryButtonText}>
+                        Envoyer {selectedDoc?.type === 'cni' ? 'la CNI' : 'le permis'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    styles.secondaryButton,
+                    { backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5" }
+                  ]}
+                  onPress={() => {
+                    setShowVerifyModal(false);
+                    setSelectedDoc(null);
+                  }}
+                >
+                  <Text style={[
+                    styles.secondaryButtonText,
+                    { color: isDark ? "#fff" : "#000" }
+                  ]}>
+                    Fermer
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Note d'information */}
+              {selectedDoc ? <View/> : <View style={styles.infoNote}>
+                <Ionicons name="information-circle" size={16} color="#888" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[
+                    styles.infoText,
+                    { color: isDark ? "#aaa" : "#666" }
+                  ]}>
+                    <Text style={{ fontWeight: '600' }}>Important :</Text> Assurez-vous que les photos sont nettes et bien lisibles.
+                  </Text>
+                </View>
+              </View>}
             </View>
-          </View>
+          </ScrollView>
         </View>
-      )}
+      </Modal>
 
-      {/* Gestion de plusieurs documents (optionnel) */}
-      <View style={styles.documentsList}>
-        <Text style={[
-          styles.sectionTitle,
-          { color: isDark ? "#fff" : "#000", marginBottom: 10 }
-        ]}>
-          Documents à envoyer :
-        </Text>
-        
-        <View style={styles.documentsStatus}>
-          <View style={styles.statusItem}>
-            <View style={[
-              styles.statusIndicator,
-              { backgroundColor: selectedDoc?.type === 'cni' ? '#4ade80' : '#e5e5e5' }
-            ]}>
-              <Text style={styles.statusText}>
-                {selectedDoc?.type === 'cni' ? '✓' : '1'}
-              </Text>
-            </View>
-            <Text style={[
-              styles.statusLabel,
-              { color: isDark ? "#fff" : "#000" }
-            ]}>
-              CNI {selectedDoc?.type === 'cni' ? '(Sélectionné)' : '(Manquant)'}
-            </Text>
-          </View>
-          
-          <View style={styles.statusItem}>
-            <View style={[
-              styles.statusIndicator,
-              { backgroundColor: selectedDoc?.type === 'permis' ? '#4ade80' : '#e5e5e5' }
-            ]}>
-              <Text style={styles.statusText}>
-                {selectedDoc?.type === 'permis' ? '✓' : '2'}
-              </Text>
-            </View>
-            <Text style={[
-              styles.statusLabel,
-              { color: isDark ? "#fff" : "#000" }
-            ]}>
-              Permis {selectedDoc?.type === 'permis' ? '(Sélectionné)' : '(Manquant)'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Boutons d'action */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            styles.primaryButton,
-            { opacity: !selectedDoc ? 0.6 : 1 }
-          ]}
-          onPress={async () => {
-            if (!selectedDoc) {
-              alert("Veuillez sélectionner un document");
-              return;
-            }
-
-            try {
-              const token = await AsyncStorage.getItem("mobile_token");
-              const formData = new FormData();
-              
-              // Ajouter le type de document au FormData
-              formData.append('document_type', selectedDoc.type);
-              formData.append('file', {
-                uri: selectedDoc.uri,
-                type: selectedDoc.mimeType || 'image/jpeg',
-                name: selectedDoc.name,
-              }as any);
-
-              const response = await fetch(
-                "http://192.168.1.18:3000/carpools/upload-verification",
-                {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: formData,
-                }
-              );
-
-              if (response.ok) {
-                alert(`✅ ${selectedDoc.label} envoyé avec succès !\nNous vérifierons votre document sous 24h.`);
-                setShowVerifyModal(false);
-                setSelectedDoc(null);
-              } else {
-                alert("❌ Erreur lors de l'envoi du document");
-              }
-            } catch (err) {
-              console.log(err);
-              alert("❌ Erreur réseau");
-            }
-          }}
-          disabled={!selectedDoc}
-        >
-          <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.primaryButtonText}>
-            Envoyer {selectedDoc?.type === 'cni' ? 'la CNI' : 'le permis'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            styles.secondaryButton,
-            { backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5" }
-          ]}
-          onPress={() => {
-            setShowVerifyModal(false);
-            setSelectedDoc(null);
-          }}
-        >
-          <Text style={[
-            styles.secondaryButtonText,
-            { color: isDark ? "#fff" : "#000" }
-          ]}>
-            Fermer
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Note d'information */}
-      <View style={styles.infoNote}>
-        <Ionicons name="information-circle" size={16} color="#888" />
-        <View style={{ flex: 1 }}>
-          <Text style={[
-            styles.infoText,
-            { color: isDark ? "#aaa" : "#666" }
-          ]}>
-            <Text style={{ fontWeight: '600' }}>Important :</Text>  Assurez-vous que les photos sont nettes et bien lisibles.
-          </Text>
-        </View>
-      </View>
-    </View>
-  </View>
-</Modal>
-
+      {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Covoiturage</Text>
         <Text style={[styles.subtitle, { color: colors.subText }]}>
-          Pour une ville plus ecologique
+          Pour une ville plus écologique
         </Text>
         <Ionicons
           name="car-sport-outline"
@@ -561,6 +576,7 @@ export default function Convoiturage() {
           style={{ position: "absolute", right: 0, top: 10 }}
         />
       </View>
+
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
@@ -751,7 +767,7 @@ export default function Convoiturage() {
             <View style={styles.modalContainer}>
               <View
                 style={[
-                  styles.modalContent,
+                  styles.modalContentTrip,
                   { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
                 ]}
               >
@@ -759,7 +775,7 @@ export default function Convoiturage() {
                   <>
                     <Text
                       style={[
-                        styles.modalTitle,
+                        styles.modalTitleTrip,
                         { color: isDark ? "#fff" : "#000" },
                       ]}
                     >
@@ -905,48 +921,30 @@ export default function Convoiturage() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 60 },
-
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
+  container: { 
+    flex: 1, 
+    paddingHorizontal: 16, 
+    paddingTop: 60 
   },
-  header: { marginTop: 0 },
-  title: { fontSize: 23, fontWeight: "700" },
-  subtitle: { fontSize: 15, marginTop: 4, marginBottom: 10 },
+
+  header: { 
+    marginTop: 0 
+  },
+  title: { 
+    fontSize: 23, 
+    fontWeight: "700" 
+  },
+  subtitle: { 
+    fontSize: 15, 
+    marginTop: 4, 
+    marginBottom: 10 
+  },
+  
+  // Tabs
   tabsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 16,
-  },
-  modalButtonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    width: "100%",
-    marginTop: 20,
-  },
-
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  confirmButton: {
-    backgroundColor: "#3b82f6", // bleu moderne
-  },
-
-  closeButton: {
-    backgroundColor: "#ef4444", // rouge moderne
-  },
-
-  modalButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
   },
   tab: {
     flexDirection: "row",
@@ -958,10 +956,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginHorizontal: 6,
   },
-  tabText: { fontSize: 15, fontWeight: "600", marginLeft: 6 },
-  searchBox: { borderRadius: 16, padding: 16, marginBottom: 20 },
-  //subtitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
-  input: { marginBottom: 12, padding: 12, borderRadius: 12, fontSize: 15 },
+  tabText: { 
+    fontSize: 15, 
+    fontWeight: "600", 
+    marginLeft: 6 
+  },
+
+  // Search
+  searchBox: { 
+    borderRadius: 16, 
+    padding: 16, 
+    marginBottom: 20 
+  },
+  input: { 
+    marginBottom: 12, 
+    padding: 12, 
+    borderRadius: 12, 
+    fontSize: 15 
+  },
   searchButton: {
     flexDirection: "row",
     justifyContent: "center",
@@ -970,22 +982,147 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
   },
+  searchButtonText: { 
+    color: "#fff", 
+    fontWeight: "600", 
+    marginLeft: 6 
+  },
+
+  // Trip Cards
+  tripCard: { 
+    padding: 16, 
+    borderRadius: 14, 
+    marginBottom: 16 
+  },
+  tripRoute: { 
+    fontSize: 16, 
+    fontWeight: "700" 
+  },
+  price: { 
+    fontSize: 18, 
+    color: "#1041b3", 
+    fontWeight: "700", 
+    marginBottom: 4 
+  },
+  tripInfo: { 
+    fontSize: 13, 
+    color: "#999", 
+    marginTop: 2 
+  },
+  driverRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginTop: 12 
+  },
+  avatar: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    marginRight: 10 
+  },
+  driverName: { 
+    fontSize: 15, 
+    fontWeight: "600" 
+  },
+  driverRating: { 
+    fontSize: 13, 
+    color: "#999" 
+  },
+  seats: { 
+    fontSize: 14, 
+    fontWeight: "600", 
+    color: "#999", 
+    marginRight: 8 
+  },
+  reserveButton: {
+    backgroundColor: "#1041b3",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  reserveButtonText: { 
+    color: "#fff", 
+    fontWeight: "600" 
+  },
+
+  // Trip Reservation Modal
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContentTrip: { 
+    width: "85%", 
+    borderRadius: 16, 
+    padding: 20 
+  },
+  modalTitleTrip: { 
+    fontSize: 18, 
+    fontWeight: "700", 
+    marginBottom: 12 
+  },
+  modalText: { 
+    fontSize: 14, 
+    marginBottom: 6 
+  },
+  modalPrice: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    width: "100%",
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmButton: {
+    backgroundColor: "#3b82f6",
+  },
+  closeButton: {
+    backgroundColor: "#ef4444",
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  // Verification Modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalContentt: {
+  modalScroll: {
+    width: '100%',
+  },
+  modalScrollContent: {
+    paddingVertical: 20,
+  },
+  modalContent: {
     width: '90%',
-    maxHeight: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
     borderRadius: 16,
     padding: 20,
   },
   modalHeader: {
     marginBottom: 20,
   },
-  modalTitlee: {
+  modalTitle: {
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 5,
@@ -994,6 +1131,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  
+  // Documents Section
   documentsSection: {
     marginBottom: 20,
   },
@@ -1042,8 +1181,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
+  
+  // Document Selection
   selectionSection: {
     marginBottom: 20,
+  },
+  documentButtonsContainer: {
+    marginBottom: 10,
   },
   documentButtons: {
     flexDirection: 'row',
@@ -1052,6 +1196,7 @@ const styles = StyleSheet.create({
   },
   documentButton: {
     flex: 1,
+    minWidth: width < 350 ? 130 : 140,
     padding: 16,
     borderRadius: 12,
     borderWidth: 2,
@@ -1068,7 +1213,10 @@ const styles = StyleSheet.create({
   documentButtonText: {
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
+  
+  // Selected Document
   selectedDocumentsSection: {
     marginBottom: 20,
   },
@@ -1086,7 +1234,6 @@ const styles = StyleSheet.create({
   documentCardInfo: {
     flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   documentCardTitle: {
@@ -1096,16 +1243,19 @@ const styles = StyleSheet.create({
   },
   documentCardName: {
     fontSize: 13,
-    maxWidth: 200,
+    flex: 1,
+    marginRight: 10,
   },
   documentCardSize: {
     fontSize: 12,
-    marginLeft: 10,
+    color: '#888',
   },
   removeButton: {
     padding: 5,
     marginLeft: 10,
   },
+  
+  // Documents Status
   documentsList: {
     marginBottom: 20,
   },
@@ -1132,9 +1282,11 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 14,
   },
+  
+  // Action Buttons
   actionButtons: {
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 15,
   },
   actionButton: {
     padding: 16,
@@ -1157,6 +1309,8 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontWeight: '600',
   },
+  
+  // Info Note
   infoNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1164,51 +1318,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(136, 136, 136, 0.1)',
     gap: 8,
-    height:'8%'
   },
   infoText: {
     flex: 1,
     fontSize: 12,
     lineHeight: 16,
-  },
-  searchButtonText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
-  tripCard: { padding: 16, borderRadius: 14, marginBottom: 16 },
-  tripRoute: { fontSize: 16, fontWeight: "700" },
-  price: { fontSize: 18, color: "#1041b3", fontWeight: "700", marginBottom: 4 },
-  tripInfo: { fontSize: 13, color: "#999", marginTop: 2 },
-  driverRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
-  driverName: { fontSize: 15, fontWeight: "600" },
-  driverRating: { fontSize: 13, color: "#999" },
-  seats: { fontSize: 14, fontWeight: "600", color: "#999", marginRight: 8 },
-  reserveButton: {
-    backgroundColor: "#1041b3",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  reserveButtonText: { color: "#fff", fontWeight: "600" },
-
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: { width: "85%", borderRadius: 16, padding: 20 },
-  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
-  modalText: { fontSize: 14, marginBottom: 6 },
-  modalPrice: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  modalCloseButton: {
-    backgroundColor: "#1041b3",
-    padding: 12,
-    borderRadius: 12,
-    alignItems: "center",
   },
 });
