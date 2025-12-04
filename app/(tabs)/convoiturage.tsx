@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
 
 export default function Convoiturage() {
   const scheme = useColorScheme();
@@ -20,6 +22,75 @@ export default function Convoiturage() {
   const [activeTab, setActiveTab] = useState("rechercher");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [checkingPermission, setCheckingPermission] = useState(false);
+  const [hasCreatePermission, setHasCreatePermission] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchCovoiturage = async () => {
+      try {
+        const token = await AsyncStorage.getItem("mobile_token");
+
+        const response = await fetch("http://192.168.1.18:3000/carpools", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(data);
+        }
+      } catch (error) {
+        console.log("Erreur fetch carpool:", error);
+      } finally {
+      }
+    };
+
+    fetchCovoiturage();
+  }, []);
+
+  const checkCreatePermission = async () => {
+    try {
+      setCheckingPermission(true);
+
+      const token = await AsyncStorage.getItem("mobile_token");
+
+      const response = await fetch(
+        "http://192.168.1.18:3000/carpools/check-permission",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Accès refusé");
+      }
+
+      const data = await response.json();
+      console.log("Retour: ", data);
+
+      // ✅ Supposons que le backend renvoie { allowed: true }
+      if (data.allowed === true) {
+        setHasCreatePermission(true);
+        setActiveTab("creer"); // ✅ autorisé
+      } else {
+        setShowVerifyModal(true);
+      }
+    } catch (error) {
+      console.log("Erreur permission:", error);
+      alert("❌ Accès refusé. Contactez l’administrateur.");
+    } finally {
+      setCheckingPermission(false);
+    }
+  };
 
   const trips = [
     {
@@ -91,18 +162,405 @@ export default function Convoiturage() {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]}>Covoiturage</Text>
-              <Text style={[styles.subtitle, { color: colors.subText }]}>
-                Pour une ville plus ecologique
-              </Text>
-              <Ionicons
-                name="car-sport-outline"
-                size={22}
-                color={colors.text}
-                style={{ position: "absolute", right: 0, top: 10 }}
-              />
+      <Modal
+  animationType="slide"
+  transparent={true}
+  visible={showVerifyModal}
+  onRequestClose={() => setShowVerifyModal(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[
+      styles.modalContentt,
+      { backgroundColor: isDark ? "#1a1a1a" : "#fff" }
+    ]}>
+      {/* En-tête */}
+      <View style={styles.modalHeader}>
+        <Text style={[
+          styles.modalTitlee,
+          { color: isDark ? "#fff" : "#000" }
+        ]}>
+          Vérification du profil
+        </Text>
+        <Text style={[
+          styles.modalSubtitle,
+          { color: isDark ? "#ccc" : "#666" }
+        ]}>
+          Pour créer des trajets, vous devez vérifier votre identité
+        </Text>
+      </View>
+
+      {/* Documents requis */}
+      <View style={styles.documentsSection}>
+        <Text style={[
+          styles.sectionTitle,
+          { color: isDark ? "#fff" : "#000" }
+        ]}>
+          Documents traités :
+        </Text>
+        
+        <View style={styles.documentItem}>
+          <View style={styles.documentIconContainer}>
+            <Ionicons name="card" size={20} color="#1041b3" />
+          </View>
+          <View style={styles.documentInfo}>
+            <Text style={[
+              styles.documentTitle,
+              { color: isDark ? "#fff" : "#000" }
+            ]}>
+              Carte Nationale d'Identité (CNI)
+            </Text>
+            <Text style={[
+              styles.documentDesc,
+              { color: isDark ? "#aaa" : "#666" }
+            ]}>
+              Recto et verso bien visibles
+            </Text>
+          </View>
+          <View style={[
+            styles.documentStatus,
+            { backgroundColor: selectedDoc?.type === 'cni' ? '#4ade80' : '#e5e5e5' }
+          ]}>
+            <Text style={styles.documentStatusText}>
+              {selectedDoc?.type === 'cni' ? '✓' : '1'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.documentItem}>
+          <View style={styles.documentIconContainer}>
+            <Ionicons name="car" size={20} color="#1041b3" />
+          </View>
+          <View style={styles.documentInfo}>
+            <Text style={[
+              styles.documentTitle,
+              { color: isDark ? "#fff" : "#000" }
+            ]}>
+              Permis de conduire
+            </Text>
+            <Text style={[
+              styles.documentDesc,
+              { color: isDark ? "#aaa" : "#666" }
+            ]}>
+              Recto et verso bien visibles
+            </Text>
+          </View>
+          <View style={[
+            styles.documentStatus,
+            { backgroundColor: selectedDoc?.type === 'permis' ? '#4ade80' : '#e5e5e5' }
+          ]}>
+            <Text style={styles.documentStatusText}>
+              {selectedDoc?.type === 'permis' ? '✓' : '2'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Sélection du document */}
+      <View style={styles.selectionSection}>
+        <Text style={[
+          styles.sectionTitle,
+          { color: isDark ? "#fff" : "#000", marginBottom: 12 }
+        ]}>
+          Choisir un document à envoyer :
+        </Text>
+
+        <View style={styles.documentButtons}>
+          <TouchableOpacity
+            style={[
+              styles.documentButton,
+              { 
+                backgroundColor: selectedDoc?.type === 'cni' 
+                  ? 'rgba(16, 65, 179, 0.2)' 
+                  : isDark ? "#2a2a2a" : "#f5f5f5",
+                borderColor: selectedDoc?.type === 'cni' ? '#1041b3' : 'transparent'
+              }
+            ]}
+            onPress={async () => {
+              try {
+                const result = await DocumentPicker.getDocumentAsync({
+                  type: ["application/pdf"],
+                  copyToCacheDirectory: true,
+                });
+
+                if (!result.canceled && result.assets.length > 0) {
+                  const file = result.assets[0];
+                  setSelectedDoc({
+                    ...file,
+                    type: 'cni',
+                    label: 'Carte CNI'
+                  });
+                }
+              } catch (err) {
+                console.log("Erreur:", err);
+              }
+            }}
+          >
+            <View style={[
+              styles.documentButtonIcon,
+              { backgroundColor: isDark ? '#1a1a1a' : '#fff' }
+            ]}>
+              <Ionicons name="card" size={24} color="#1041b3" />
             </View>
+            <Text style={[
+              styles.documentButtonText,
+              { color: isDark ? "#fff" : "#000" }
+            ]}>
+              Carte CNI
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.documentButton,
+              { 
+                backgroundColor: selectedDoc?.type === 'permis' 
+                  ? 'rgba(16, 65, 179, 0.2)' 
+                  : isDark ? "#2a2a2a" : "#f5f5f5",
+                borderColor: selectedDoc?.type === 'permis' ? '#1041b3' : 'transparent'
+              }
+            ]}
+            onPress={async () => {
+              try {
+                const result = await DocumentPicker.getDocumentAsync({
+                  type: ["application/pdf"],
+                  copyToCacheDirectory: true,
+                });
+
+                if (!result.canceled && result.assets.length > 0) {
+                  const file = result.assets[0];
+                  setSelectedDoc({
+                    ...file,
+                    type: 'permis',
+                    label: 'Permis de conduire'
+                  });
+                }
+              } catch (err) {
+                console.log("Erreur:", err);
+              }
+            }}
+          >
+            <View style={[
+              styles.documentButtonIcon,
+              { backgroundColor: isDark ? '#1a1a1a' : '#fff' }
+            ]}>
+              <Ionicons name="car" size={24} color="#1041b3" />
+            </View>
+            <Text style={[
+              styles.documentButtonText,
+              { color: isDark ? "#fff" : "#000" }
+            ]}>
+              Permis
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Liste des documents sélectionnés */}
+      {selectedDoc && (
+        <View style={styles.selectedDocumentsSection}>
+          <Text style={[
+            styles.sectionTitle,
+            { color: isDark ? "#fff" : "#000", marginBottom: 10 }
+          ]}>
+            Document sélectionné :
+          </Text>
+          
+          <View style={[
+            styles.documentCard,
+            { backgroundColor: isDark ? "#2a2a2a" : "#f8f8f8" }
+          ]}>
+            <View style={styles.documentCardHeader}>
+              <View style={styles.documentCardIcon}>
+                <Ionicons 
+                  name={selectedDoc.type === 'cni' ? 'card' : 'car'} 
+                  size={24} 
+                  color="#1041b3" 
+                />
+              </View>
+              <View style={styles.documentCardInfo}>
+                <View>
+                  <Text style={[
+                    styles.documentCardTitle,
+                    { color: isDark ? "#fff" : "#000" }
+                  ]}>
+                    {selectedDoc.label}
+                  </Text>
+                  <Text style={[
+                    styles.documentCardName,
+                    { color: isDark ? "#aaa" : "#666" }
+                  ]} numberOfLines={1}>
+                    {selectedDoc.name}
+                  </Text>
+                </View>
+                <Text style={[
+                  styles.documentCardSize,
+                  { color: isDark ? "#888" : "#888" }
+                ]}>
+                  {(selectedDoc.size / 1024).toFixed(1)} KB
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setSelectedDoc(null)}
+                style={styles.removeButton}
+              >
+                <Ionicons name="close-circle" size={24} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Gestion de plusieurs documents (optionnel) */}
+      <View style={styles.documentsList}>
+        <Text style={[
+          styles.sectionTitle,
+          { color: isDark ? "#fff" : "#000", marginBottom: 10 }
+        ]}>
+          Documents à envoyer :
+        </Text>
+        
+        <View style={styles.documentsStatus}>
+          <View style={styles.statusItem}>
+            <View style={[
+              styles.statusIndicator,
+              { backgroundColor: selectedDoc?.type === 'cni' ? '#4ade80' : '#e5e5e5' }
+            ]}>
+              <Text style={styles.statusText}>
+                {selectedDoc?.type === 'cni' ? '✓' : '1'}
+              </Text>
+            </View>
+            <Text style={[
+              styles.statusLabel,
+              { color: isDark ? "#fff" : "#000" }
+            ]}>
+              CNI {selectedDoc?.type === 'cni' ? '(Sélectionné)' : '(Manquant)'}
+            </Text>
+          </View>
+          
+          <View style={styles.statusItem}>
+            <View style={[
+              styles.statusIndicator,
+              { backgroundColor: selectedDoc?.type === 'permis' ? '#4ade80' : '#e5e5e5' }
+            ]}>
+              <Text style={styles.statusText}>
+                {selectedDoc?.type === 'permis' ? '✓' : '2'}
+              </Text>
+            </View>
+            <Text style={[
+              styles.statusLabel,
+              { color: isDark ? "#fff" : "#000" }
+            ]}>
+              Permis {selectedDoc?.type === 'permis' ? '(Sélectionné)' : '(Manquant)'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Boutons d'action */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.primaryButton,
+            { opacity: !selectedDoc ? 0.6 : 1 }
+          ]}
+          onPress={async () => {
+            if (!selectedDoc) {
+              alert("Veuillez sélectionner un document");
+              return;
+            }
+
+            try {
+              const token = await AsyncStorage.getItem("mobile_token");
+              const formData = new FormData();
+              
+              // Ajouter le type de document au FormData
+              formData.append('document_type', selectedDoc.type);
+              formData.append('file', {
+                uri: selectedDoc.uri,
+                type: selectedDoc.mimeType || 'image/jpeg',
+                name: selectedDoc.name,
+              }as any);
+
+              const response = await fetch(
+                "http://192.168.1.18:3000/carpools/upload-verification",
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: formData,
+                }
+              );
+
+              if (response.ok) {
+                alert(`✅ ${selectedDoc.label} envoyé avec succès !\nNous vérifierons votre document sous 24h.`);
+                setShowVerifyModal(false);
+                setSelectedDoc(null);
+              } else {
+                alert("❌ Erreur lors de l'envoi du document");
+              }
+            } catch (err) {
+              console.log(err);
+              alert("❌ Erreur réseau");
+            }
+          }}
+          disabled={!selectedDoc}
+        >
+          <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={styles.primaryButtonText}>
+            Envoyer {selectedDoc?.type === 'cni' ? 'la CNI' : 'le permis'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.secondaryButton,
+            { backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5" }
+          ]}
+          onPress={() => {
+            setShowVerifyModal(false);
+            setSelectedDoc(null);
+          }}
+        >
+          <Text style={[
+            styles.secondaryButtonText,
+            { color: isDark ? "#fff" : "#000" }
+          ]}>
+            Fermer
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Note d'information */}
+      <View style={styles.infoNote}>
+        <Ionicons name="information-circle" size={16} color="#888" />
+        <View style={{ flex: 1 }}>
+          <Text style={[
+            styles.infoText,
+            { color: isDark ? "#aaa" : "#666" }
+          ]}>
+            <Text style={{ fontWeight: '600' }}>Important :</Text>  Assurez-vous que les photos sont nettes et bien lisibles.
+          </Text>
+        </View>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>Covoiturage</Text>
+        <Text style={[styles.subtitle, { color: colors.subText }]}>
+          Pour une ville plus ecologique
+        </Text>
+        <Ionicons
+          name="car-sport-outline"
+          size={22}
+          color={colors.text}
+          style={{ position: "absolute", right: 0, top: 10 }}
+        />
+      </View>
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
@@ -155,7 +613,7 @@ export default function Convoiturage() {
                   : "#e6e6e6",
             },
           ]}
-          onPress={() => setActiveTab("creer")}
+          onPress={checkCreatePermission}
         >
           <Ionicons
             name="add"
@@ -358,7 +816,7 @@ export default function Convoiturage() {
       )}
 
       {/* Tab créer */}
-      {activeTab === "creer" && (
+      {activeTab === "creer" && hasCreatePermission && (
         <View>
           <Text
             style={{
@@ -448,14 +906,14 @@ export default function Convoiturage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 60 },
-  
+
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
   },
   header: { marginTop: 0 },
   title: { fontSize: 23, fontWeight: "700" },
-  subtitle: { fontSize: 15, marginTop: 4,marginBottom:10 },
+  subtitle: { fontSize: 15, marginTop: 4, marginBottom: 10 },
   tabsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -511,6 +969,207 @@ const styles = StyleSheet.create({
     backgroundColor: "#1041b3",
     padding: 12,
     borderRadius: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContentt: {
+    width: '90%',
+    maxHeight: '100%',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalHeader: {
+    marginBottom: 20,
+  },
+  modalTitlee: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 5,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  documentsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 15,
+  },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  documentIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 65, 179, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  documentInfo: {
+    flex: 1,
+  },
+  documentTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  documentDesc: {
+    fontSize: 13,
+  },
+  documentStatus: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  documentStatusText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  selectionSection: {
+    marginBottom: 20,
+  },
+  documentButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  documentButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  documentButtonIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  documentButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedDocumentsSection: {
+    marginBottom: 20,
+  },
+  documentCard: {
+    borderRadius: 12,
+    padding: 15,
+  },
+  documentCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  documentCardIcon: {
+    marginRight: 12,
+  },
+  documentCardInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  documentCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  documentCardName: {
+    fontSize: 13,
+    maxWidth: 200,
+  },
+  documentCardSize: {
+    fontSize: 12,
+    marginLeft: 10,
+  },
+  removeButton: {
+    padding: 5,
+    marginLeft: 10,
+  },
+  documentsList: {
+    marginBottom: 20,
+  },
+  documentsStatus: {
+    gap: 10,
+  },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  statusLabel: {
+    fontSize: 14,
+  },
+  actionButtons: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  actionButton: {
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButton: {
+    backgroundColor: '#1041b3',
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  secondaryButton: {
+    backgroundColor: '#f5f5f5',
+  },
+  secondaryButtonText: {
+    fontWeight: '600',
+  },
+  infoNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    gap: 8,
+    height:'8%'
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
   searchButtonText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
   tripCard: { padding: 16, borderRadius: 14, marginBottom: 16 },
