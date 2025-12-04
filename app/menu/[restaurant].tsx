@@ -137,40 +137,60 @@ export default function RestaurantMenu() {
       </View>
 
       {/* List */}
-      {menuList.map((item: MenuItem, i: number) => (
+      {menuList.length === 0 ? (
         <View
-          key={i}
           style={[
             styles.menuCard,
-            { backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4" },
+            {
+              backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4",
+              justifyContent: "center",
+              alignItems: "center",
+            },
           ]}
         >
-          <Image
-            source={
-              item.image
-                ? { uri: item.image }
-                : require("../../assets/images/default.webp")
-            }
-            style={styles.itemImage}
-          />
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text
-              style={[styles.menuTitle, { color: isDark ? "#fff" : "#000" }]}
-            >
-              {item.title}
-            </Text>
-            <Text
-              style={[styles.menuDesc, { color: isDark ? "#bbb" : "#666" }]}
-            >
-              {item.description}
-            </Text>
-            <Text style={styles.menuPrice}>{item.price}</Text>
-          </View>
-          <TouchableOpacity style={styles.addButton}>
-            <Text style={styles.addButtonText}>+ Ajouter</Text>
-          </TouchableOpacity>
+          <Text
+            style={{ color: isDark ? "#fff" : "#000", fontStyle: "italic" }}
+          >
+            Aucun {activeTab === "petitDej" ? "petit déjeuner" : "déjeuner"}{" "}
+            disponible
+          </Text>
         </View>
-      ))}
+      ) : (
+        menuList.map((item: MenuItem, i: number) => (
+          <View
+            key={i}
+            style={[
+              styles.menuCard,
+              { backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4" },
+            ]}
+          >
+            <Image
+              source={
+                item.image
+                  ? { uri: item.image }
+                  : require("../../assets/images/default.webp")
+              }
+              style={styles.itemImage}
+            />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text
+                style={[styles.menuTitle, { color: isDark ? "#fff" : "#000" }]}
+              >
+                {item.title}
+              </Text>
+              <Text
+                style={[styles.menuDesc, { color: isDark ? "#bbb" : "#666" }]}
+              >
+                {item.description}
+              </Text>
+              <Text style={styles.menuPrice}>{item.price}</Text>
+            </View>
+            <TouchableOpacity style={styles.addButton}>
+              <Text style={styles.addButtonText}>+ Ajouter</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -254,18 +274,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   goBackButton: {
-  position: "absolute",
-  top: 40, // ajuste selon le padding de ton header
-  left: 16,
-  backgroundColor: "#ffffff80", // fond semi-transparent
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 12,
-  zIndex: 10,
-},
-goBackText: {
-  fontSize: 16,
-  fontWeight: "600",
-},
-
+    position: "absolute",
+    top: 40, // ajuste selon le padding de ton header
+    left: 16,
+    backgroundColor: "#ffffff80", // fond semi-transparent
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  goBackText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });
