@@ -423,6 +423,34 @@ useEffect(() => {
     divider: isDark ? "#2f2f2f" : "#e5e5e5",
   };
 
+  const handleConfirmReservation = async () => {
+  if (!selectedTrip) return;
+
+    const token = await AsyncStorage.getItem('mobile_token')
+  try {
+    const response = await fetch("http://192.168.1.18:3000/carpools/demande", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`, // si tu utilises un token
+      },
+      body: selectedTrip.id
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Erreur lors de la demande");
+    }
+
+    alert("✅ Demande envoyée avec succès !");
+    setModalVisible(false);
+  } catch (error) {
+    console.error("Erreur réservation :", error);
+    alert("❌ Échec de l'envoi de la demande");
+  }
+};
+
   return (
     <ScrollView
       style={[
@@ -1127,7 +1155,7 @@ useEffect(() => {
                     <View style={styles.modalButtonContainer}>
                       <TouchableOpacity
                         style={[styles.modalButton, styles.confirmButton]}
-                        onPress={() => setModalVisible(false)}
+                        onPress={handleConfirmReservation}
                       >
                         <Text style={styles.modalButtonText}>Confirmer</Text>
                       </TouchableOpacity>
