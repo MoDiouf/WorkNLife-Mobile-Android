@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
-import DatePicker from 'react-native-date-picker';
+import DatePicker from "react-native-date-picker";
+import { io, Socket } from "socket.io-client";
+
 const { width } = Dimensions.get("window");
 interface BackendDriver {
   full_name: string;
@@ -68,11 +70,15 @@ export default function Convoiturage() {
   const [prix, setPrix] = useState("");
   const [departureTime, setDepartureTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-const [dateInput, setDateInput] = useState("");
-const [carpool, setCarpool] = useState<Trip[]>([])
-const [from, setFrom] = useState("");
-const [to, setTo] = useState("");
-const [filteredCarpool, setFilteredCarpool] = useState<Trip[]>([]);
+  const [dateInput, setDateInput] = useState("");
+  const [carpool, setCarpool] = useState<Trip[]>([]);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [filteredCarpool, setFilteredCarpool] = useState<Trip[]>([]);
+  const [rideRequests, setRideRequests] = useState<any[]>([]);
+  const socketRef = useRef<Socket | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchCovoiturage = async () => {
@@ -90,25 +96,26 @@ const [filteredCarpool, setFilteredCarpool] = useState<Trip[]>([]);
         if (response.ok) {
           const backendData = await response.json();
           //console.log(backendData);
-          
-        const trips = backendData.map((trip:any)  => ({
-          from: trip.start_point,
-          to: trip.end_point,
-          date: formatDateLabel(trip.departure_time),
-          time: formatTime(trip.departure_time),
-          duration: "À définir", // non fourni par le backend
-          price: `${trip.price_per_seat} FCFA`,
-          driver: {
-            name: trip.driver.full_name,
-            rating: 4.5, // valeur par défaut si non fournie
-            avatar: require("../../assets/images/profile_WNL.jpg"), // valeur par défaut
-          },
-          seats: `${trip.available_seats} places`,
-          keyPlaces: trip.key_points || [],
-        }));
-        //console.log(trips);
-        
-        setCarpool(trips);
+
+          const trips = backendData.map((trip: any) => ({
+            idCarpool: trip.id_carpool,
+            from: trip.start_point,
+            to: trip.end_point,
+            date: formatDateLabel(trip.departure_time),
+            time: formatTime(trip.departure_time),
+            duration: "À définir", // non fourni par le backend
+            price: `${trip.price_per_seat} FCFA`,
+            driver: {
+              name: trip.driver.full_name,
+              rating: 4.5, // valeur par défaut si non fournie
+              avatar: require("../../assets/images/profile_WNL.jpg"), // valeur par défaut
+            },
+            seats: `${trip.available_seats} places`,
+            keyPlaces: trip.key_points || [],
+          }));
+          //console.log(trips);
+
+          setCarpool(trips);
         }
       } catch (error) {
         console.log("Erreur fetch carpool:", error);
@@ -117,32 +124,126 @@ const [filteredCarpool, setFilteredCarpool] = useState<Trip[]>([]);
 
     fetchCovoiturage();
   }, []);
+  const SOCKET_URL = "http://192.168.1.18:3000";
+  useEffect(() => {
+    const initializeSocket = async () => {
+      try {
+        const user = await AsyncStorage.getItem("userData");
+
+        if (!user) {
+          console.warn("Aucun user trouvé dans AsyncStorage");
+          return;
+        }
+
+        const parsedUser = JSON.parse(user);
+
+        // ✅ Connexion WebSocket
+        const socket = io(SOCKET_URL, {
+          query: { userId: parsedUser.id_user },
+          transports: ["websocket"], // ✅ évite certains bugs Android
+        });
+
+        socketRef.current = socket;
+
+        // ✅ Écoute des nouvelles demandes
+        socket.on("newRideRequest", (data) => {
+          console.log("Nouvelle demande reçue:", data);
+          setRideRequests((prev) => [...prev, data]);
+          //alert(`Nouvelle demande de ${data.user.name}`);
+        });
+
+        // ✅ Optionnel : écouter la réponse si ce device est aussi passager
+        socket.on("rideRequestResponse", (data) => {
+          console.log("Réponse à votre demande:", data);
+        });
+      } catch (error) {
+        console.error("Erreur socket:", error);
+      }
+    };
+
+    initializeSocket();
+
+    // ✅ CLEANUP CORRECT DU useEffect
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, []);
+  useEffect(() => {
+    const loadRequests = async () => {
+      try {
+        const token = await AsyncStorage.getItem("mobile_token");
+
+        if (!token) {
+          console.log("Aucun token trouvé");
+          return;
+        }
+
+        const res = await fetch(`http://192.168.1.18:3000/carpools/requests`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.log("Erreur API:", errText);
+          return;
+        }
+
+        const data = await res.json();
+        //console.log('Les requests',data);
+
+        setRideRequests(data);
+      } catch (err) {
+        console.log("Erreur chargement demandes :", err);
+      }
+    };
+
+    loadRequests();
+  }, []);
+useEffect(() => {
+  if (rideRequests.length > 0) {
+    const pending = rideRequests.filter(req => req.status === "en_attente");
+
+    if (pending.length > 0) {
+      setSelectedRequest(pending[pending.length - 1]);
+      setIsModalVisible(true);
+    }
+  }
+}, [rideRequests]);
 
   const formatTime = (isoDate: string): string => {
-  const date = new Date(isoDate);
-  return date.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).replace(":", "h");
-};
+    const date = new Date(isoDate);
+    return date
+      .toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      .replace(":", "h");
+  };
 
-const formatDateLabel = (isoDate: string): string => {
-  const date = new Date(isoDate);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(today.getDate() + 1);
+  const formatDateLabel = (isoDate: string): string => {
+    const date = new Date(isoDate);
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
 
-  const isToday = date.toDateString() === today.toDateString();
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
+    const isToday = date.toDateString() === today.toDateString();
+    const isTomorrow = date.toDateString() === tomorrow.toDateString();
 
-  if (isToday) return "Aujourd’hui";
-  if (isTomorrow) return "Demain";
+    if (isToday) return "Aujourd’hui";
+    if (isTomorrow) return "Demain";
 
-  return date.toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-  });
-};
+    return date.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
   const checkCreatePermission = async () => {
     try {
       setCheckingPermission(true);
@@ -165,7 +266,7 @@ const formatDateLabel = (isoDate: string): string => {
       }
 
       const data = await response.json();
-      console.log("Retour: ", data);
+      //console.log("Retour: ", data);
 
       if (data.allowed === true) {
         setHasCreatePermission(true);
@@ -250,168 +351,105 @@ const formatDateLabel = (isoDate: string): string => {
     }
   };
 
-  const trips = [
-    {
-      from: "Paris",
-      to: "Lyon",
-      date: "Aujourd'hui",
-      time: "14h30",
-      duration: "4h30",
-      price: "25€",
-      driver: {
-        name: "Marie L.",
-        rating: 4.8,
-        avatar: require("../../assets/images/profile_WNL.jpg"),
-      },
-      seats: "2 places",
-      keyPlaces: ["Aéroport CDG", "Gare de Lyon", "Autoroute A6"],
-    },
-    {
-      from: "Paris",
-      to: "Marseille",
-      date: "Demain",
-      time: "08h00",
-      duration: "7h15",
-      price: "45€",
-      driver: {
-        name: "Pierre M.",
-        rating: 4.9,
-        avatar: require("../../assets/images/profile_WNL.jpg"),
-      },
-      seats: "1 place",
-      keyPlaces: ["Périphérique Paris", "Lyon", "Autoroute A7"],
-    },
-    {
-      from: "Lyon",
-      to: "Nice",
-      date: "23 Nov",
-      time: "15h45",
-      duration: "5h20",
-      price: "35€",
-      driver: {
-        name: "Sophie R.",
-        rating: 4.7,
-        avatar: require("../../assets/images/profile_WNL.jpg"),
-      },
-      seats: "2 places",
-      keyPlaces: ["Autoroute A8", "Aéroport Nice Côte d'Azur"],
-    },
-  ];
-
   const openModal = (trip: any) => {
     setSelectedTrip(trip);
     setModalVisible(true);
   };
 
-  const handleDateConfirm = (date: Date) => {
-    setDepartureTime(date);
-    setShowDatePicker(false);
-  };
-  const handleSearch = () => {
-  const results = carpool.filter((trip) => {
-    const matchFrom = from
-      ? trip.from.toLowerCase().includes(from.toLowerCase())
-      : true;
-
-    const matchTo = to
-      ? trip.to.toLowerCase().includes(to.toLowerCase())
-      : true;
-
-    return matchFrom && matchTo;
-  });
-
-  setFilteredCarpool(results);
-};
-
   const handleSubmit = async () => {
-  // Validation
-  if (!depart || !arrivee || !dateInput || !places || !prix) {
-    Alert.alert("Erreur", "Veuillez remplir tous les champs obligatoires");
-    return;
-  }
-  
-  // Convertir la date saisie
-  let departureDateTime;
-  try {
-    // Format: "2024-12-25 14:30"
-    const [datePart, timePart] = dateInput.split(' ');
-    const [year, month, day] = datePart.split('-').map(Number);
-    const [hours, minutes] = timePart.split(':').map(Number);
-    
-    departureDateTime = new Date(year, month - 1, day, hours, minutes);
-    
-    if (isNaN(departureDateTime.getTime())) {
-      Alert.alert("Erreur", "Format de date invalide. Utilisez AAAA-MM-JJ HH:MM");
+    // Validation
+    if (!depart || !arrivee || !dateInput || !places || !prix) {
+      Alert.alert("Erreur", "Veuillez remplir tous les champs obligatoires");
       return;
     }
-  } catch (error) {
-    Alert.alert("Erreur", "Format de date invalide. Utilisez AAAA-MM-JJ HH:MM");
-    return;
-  }
-  
-  // Vérifier que la date n'est pas passée
-  if (departureDateTime < new Date()) {
-    Alert.alert("Erreur", "La date de départ ne peut pas être dans le passé");
-    return;
-  }
 
-  const trajet = {
-    start_point: depart,
-    end_point: arrivee,
-    departure_time: departureDateTime.toISOString(),
-    key_points: pointsCles ? pointsCles.split(",").map(p => p.trim()) : [],
-    available_seats: Number(places),
-    price_per_seat: Number(prix),
-  };
+    // Convertir la date saisie
+    let departureDateTime;
+    try {
+      // Format: "2024-12-25 14:30"
+      const [datePart, timePart] = dateInput.split(" ");
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hours, minutes] = timePart.split(":").map(Number);
 
-  console.log("Trajet envoyé :", trajet);
-  console.log("Date ISO :", departureDateTime.toISOString());
+      departureDateTime = new Date(year, month - 1, day, hours, minutes);
 
-  // Ici votre fetch API...
-  
-  // Exemple :
-  
-  try {
-    const token = await AsyncStorage.getItem("mobile_token");
-    const response = await fetch("http://192.168.1.18:3000/carpools", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(trajet),
-    });
-    
-    if (response.ok) {
-      Alert.alert("Succès", "Trajet publié !");
-      // Réinitialiser
-      setDepart("");
-      setArrivee("");
-      setDateInput("");
-      setPointsCles("");
-      setPlaces("");
-      setPrix("");
+      if (isNaN(departureDateTime.getTime())) {
+        Alert.alert(
+          "Erreur",
+          "Format de date invalide. Utilisez AAAA-MM-JJ HH:MM"
+        );
+        return;
+      }
+    } catch (error) {
+      Alert.alert(
+        "Erreur",
+        "Format de date invalide. Utilisez AAAA-MM-JJ HH:MM"
+      );
+      return;
     }
-  } catch (error) {
-    Alert.alert("Erreur", "Impossible de publier le trajet");
-  }
-  
-};
-useEffect(() => {
-  const results = carpool.filter((trip) => {
-    const matchFrom = from
-      ? trip.from.toLowerCase().includes(from.toLowerCase())
-      : true;
 
-    const matchTo = to
-      ? trip.to.toLowerCase().includes(to.toLowerCase())
-      : true;
+    // Vérifier que la date n'est pas passée
+    if (departureDateTime < new Date()) {
+      Alert.alert("Erreur", "La date de départ ne peut pas être dans le passé");
+      return;
+    }
 
-    return matchFrom && matchTo;
-  });
+    const trajet = {
+      start_point: depart,
+      end_point: arrivee,
+      departure_time: departureDateTime.toISOString(),
+      key_points: pointsCles ? pointsCles.split(",").map((p) => p.trim()) : [],
+      available_seats: Number(places),
+      price_per_seat: Number(prix),
+    };
 
-  setFilteredCarpool(results);
-}, [from, to, carpool]);
+    console.log("Trajet envoyé :", trajet);
+    console.log("Date ISO :", departureDateTime.toISOString());
+
+    // Ici votre fetch API...
+
+    // Exemple :
+
+    try {
+      const token = await AsyncStorage.getItem("mobile_token");
+      const response = await fetch("http://192.168.1.18:3000/carpools", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(trajet),
+      });
+
+      if (response.ok) {
+        Alert.alert("Succès", "Trajet publié !");
+        // Réinitialiser
+        setDepart("");
+        setArrivee("");
+        setDateInput("");
+        setPointsCles("");
+        setPlaces("");
+        setPrix("");
+      }
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de publier le trajet");
+    }
+  };
+  useEffect(() => {
+    const results = carpool.filter((trip) => {
+      const matchFrom = from
+        ? trip.from.toLowerCase().includes(from.toLowerCase())
+        : true;
+
+      const matchTo = to
+        ? trip.to.toLowerCase().includes(to.toLowerCase())
+        : true;
+
+      return matchFrom && matchTo;
+    });
+
+    setFilteredCarpool(results);
+  }, [from, to, carpool]);
 
   const colors = {
     bg: isDark ? "#121212" : "#f5f5f5",
@@ -424,32 +462,80 @@ useEffect(() => {
   };
 
   const handleConfirmReservation = async () => {
-  if (!selectedTrip) return;
+    if (!selectedTrip) return;
+    console.log("Test", selectedTrip.idCarpool);
+    const token = await AsyncStorage.getItem("mobile_token");
+    try {
+      const response = await fetch(
+        "http://192.168.1.18:3000/carpools/demande",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // si tu utilises un token
+          },
+          body: JSON.stringify({
+            idCarpool: selectedTrip.idCarpool,
+          }),
+        }
+      );
 
-    const token = await AsyncStorage.getItem('mobile_token')
-  try {
-    const response = await fetch("http://192.168.1.18:3000/carpools/demande", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // si tu utilises un token
-      },
-      body: selectedTrip.id
-    });
+      const data = await response.json();
 
-    const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Erreur lors de la demande");
+      }
 
-    if (!response.ok) {
-      throw new Error(data.message || "Erreur lors de la demande");
+      alert("✅ Demande envoyée avec succès !");
+      setModalVisible(false);
+    } catch (error) {
+      console.error("Erreur réservation :", error);
+      alert("❌ Échec de l'envoi de la demande");
     }
+  };
+  const respondToRequest = async (status: any) => {
+    try {
+      const token = await AsyncStorage.getItem("mobile_token");
 
-    alert("✅ Demande envoyée avec succès !");
-    setModalVisible(false);
-  } catch (error) {
-    console.error("Erreur réservation :", error);
-    alert("❌ Échec de l'envoi de la demande");
-  }
-};
+      if (!token) {
+        alert("Token manquant");
+        return;
+      }
+
+      const res = await fetch(`http://192.168.1.18:3000/carpools/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: status, // "accepte" ou "refuse"
+          request_id: selectedRequest.rideRequestId, // ✅ important
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        console.log("Erreur serveur:", err);
+        alert("Erreur lors de la réponse");
+        return;
+      }
+
+      const data = await res.json();
+
+      // ✅ Supprimer la demande de la liste après réponse
+      setRideRequests(prev =>
+  prev.filter(r => r.id_request !== selectedRequest.id_request)
+);
+
+      setIsModalVisible(false);
+
+      alert(status === "accepte" ? "✅ Trajet accepté" : "❌ Trajet refusé");
+    } catch (error) {
+      console.log("Erreur réponse trajet:", error);
+    }
+  };
+  console.log("", filteredCarpool);
 
   return (
     <ScrollView
@@ -898,6 +984,91 @@ useEffect(() => {
           </ScrollView>
         </View>
       </Modal>
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              width: "90%",
+              borderRadius: 15,
+              padding: 20,
+            }}
+          >
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
+            >
+              🚗 Nouvelle demande de trajet
+            </Text>
+
+            {selectedRequest && (
+              <>
+                <Text>📧 Email : {selectedRequest.user.email}</Text>
+                <Text>📞 Téléphone : {selectedRequest.user.phone}</Text>
+                <Text>
+                  📍 Lieu de prise : {selectedRequest.user.pickup_point}
+                </Text>
+                <Text>🕔 Heure : {selectedRequest.user.heure}</Text>
+              </>
+            )}
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginTop: 20,
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  backgroundColor: "green",
+                  padding: 12,
+                  borderRadius: 8,
+                  width: "45%",
+                  alignItems: "center",
+                }}
+                onPress={() => {
+                  console.log("✅ Trajet accepté");
+                  respondToRequest("accepte");
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Accepter
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: "red",
+                  padding: 12,
+                  borderRadius: 8,
+                  width: "45%",
+                  alignItems: "center",
+                }}
+                onPress={() => {
+                  console.log("❌ Trajet refusé");
+                  respondToRequest("refuse");
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Refuser
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Header */}
       <View style={styles.header}>
@@ -1005,7 +1176,7 @@ useEffect(() => {
               placeholder="Départ"
               placeholderTextColor="#888"
               value={from}
-  onChangeText={setFrom}
+              onChangeText={setFrom}
               style={[
                 styles.input,
                 {
@@ -1019,7 +1190,7 @@ useEffect(() => {
               placeholder="Arrivée"
               placeholderTextColor="#888"
               value={to}
-  onChangeText={setTo}
+              onChangeText={setTo}
               style={[
                 styles.input,
                 {
@@ -1028,78 +1199,79 @@ useEffect(() => {
                 },
               ]}
             />
-
-            
           </View>
 
-
           {/* Trajets disponibles */}
-{(filteredCarpool.length > 0 ? filteredCarpool : carpool).map((item, index) => (
-  <View
-    key={index}
-    style={[
-      styles.tripCard,
-      { backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4" },
-    ]}
-  >
-    <Text
-      style={[styles.tripRoute, { color: isDark ? "#fff" : "#000" }]}
-    >
-      {item.from} → {item.to}
-    </Text>
+          {(filteredCarpool.length > 0 ? filteredCarpool : carpool).map(
+            (item, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.tripCard,
+                  { backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tripRoute,
+                    { color: isDark ? "#fff" : "#000" },
+                  ]}
+                >
+                  {item.from} → {item.to}
+                </Text>
 
-    <Text style={styles.price}>{item.price}</Text>
+                <Text style={styles.price}>{item.price}</Text>
 
-    <Text style={styles.tripInfo}>
-      📅 {item.date} ⏰ {item.time} ⏱ {item.duration}
-    </Text>
+                <Text style={styles.tripInfo}>
+                  📅 {item.date} ⏰ {item.time} ⏱ {item.duration}
+                </Text>
 
-    <Text
-      style={[
-        styles.subtitle,
-        { color: isDark ? "#fff" : "#000", marginTop: 6 },
-      ]}
-    >
-      Points clés du trajet :
-    </Text>
+                <Text
+                  style={[
+                    styles.subtitle,
+                    { color: isDark ? "#fff" : "#000", marginTop: 6 },
+                  ]}
+                >
+                  Points clés du trajet :
+                </Text>
 
-    {item.keyPlaces.map((place, idx) => (
-      <Text key={idx} style={[styles.tripInfo, { marginLeft: 10 }]}>
-        • {place}
-      </Text>
-    ))}
+                {item.keyPlaces.map((place, idx) => (
+                  <Text key={idx} style={[styles.tripInfo, { marginLeft: 10 }]}>
+                    • {place}
+                  </Text>
+                ))}
 
-    <View style={styles.driverRow}>
-      <Image source={item.driver.avatar} style={styles.avatar} />
+                <View style={styles.driverRow}>
+                  <Image source={item.driver.avatar} style={styles.avatar} />
 
-      <View>
-        <Text
-          style={[
-            styles.driverName,
-            { color: isDark ? "#fff" : "#000" },
-          ]}
-        >
-          {item.driver.name}
-        </Text>
-        <Text style={styles.driverRating}>
-          ⭐ {item.driver.rating}
-        </Text>
-      </View>
+                  <View>
+                    <Text
+                      style={[
+                        styles.driverName,
+                        { color: isDark ? "#fff" : "#000" },
+                      ]}
+                    >
+                      {item.driver.name}
+                    </Text>
+                    <Text style={styles.driverRating}>
+                      ⭐ {item.driver.rating}
+                    </Text>
+                  </View>
 
-      <View style={{ marginLeft: "auto", flexDirection: "row" }}>
-        <Text style={styles.seats}>{item.seats}</Text>
+                  <View style={{ marginLeft: "auto", flexDirection: "row" }}>
+                    <Text style={styles.seats}>{item.seats}</Text>
 
-        <TouchableOpacity
-          style={styles.reserveButton}
-          onPress={() => openModal(item)}
-        >
-          <Text style={styles.reserveButtonText}>Réserver</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-))}
-
+                    <TouchableOpacity
+                      style={styles.reserveButton}
+                      onPress={() => openModal(item)}
+                    >
+                      <Text style={styles.reserveButtonText}>Réserver</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )
+          )}
 
           {/* Modal réservation */}
           <Modal
@@ -1215,33 +1387,35 @@ useEffect(() => {
               },
             ]}
           />
-          
+
           {/* ✅ Nouveau : Sélecteur de date et heure avec react-native-date-picker */}
           {/* Sélecteur de date SIMPLE sans installation */}
-<View>
-  <TextInput
-    placeholder="Date de départ (ex: 2024-12-25 14:30)"
-    placeholderTextColor="#888"
-    value={dateInput}
-    onChangeText={setDateInput}
-    style={[
-      styles.input,
-      {
-        backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
-        color: isDark ? "#fff" : "#000",
-      },
-    ]}
-  />
-  <Text style={{
-    fontSize: 12,
-    color: isDark ? "#aaa" : "#666",
-    marginBottom: 12,
-    marginTop: -8,
-  }}>
-    Format : AAAA-MM-JJ HH:MM (ex: 2024-12-25 14:30)
-  </Text>
-</View>
-          
+          <View>
+            <TextInput
+              placeholder="Date de départ (ex: 2024-12-25 14:30)"
+              placeholderTextColor="#888"
+              value={dateInput}
+              onChangeText={setDateInput}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
+                  color: isDark ? "#fff" : "#000",
+                },
+              ]}
+            />
+            <Text
+              style={{
+                fontSize: 12,
+                color: isDark ? "#aaa" : "#666",
+                marginBottom: 12,
+                marginTop: -8,
+              }}
+            >
+              Format : AAAA-MM-JJ HH:MM (ex: 2024-12-25 14:30)
+            </Text>
+          </View>
+
           <TextInput
             placeholder="Points clés du trajet (séparés par ,)"
             placeholderTextColor="#888"

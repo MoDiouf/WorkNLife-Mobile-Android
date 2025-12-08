@@ -1,4 +1,4 @@
-import React from "react";
+import React, { use, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, useColorScheme } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -6,17 +6,44 @@ import { router } from "expo-router";
 
 export default function Settings() {
   const scheme = useColorScheme();
-  const isDark = scheme === "dark";
+const isDark = scheme === "dark";
 
-  const logout = async () => {
-    // 1. Supprimer les tokens
-    await AsyncStorage.removeItem("mobile_token");
-    await AsyncStorage.removeItem("isLogged");
-    await AsyncStorage.removeItem("user");
+const [userData, setUserData] = useState<any>(null);
 
-    // 2. Redirection vers login
-    router.replace("/auth/login");
+const logout = async () => {
+  await AsyncStorage.removeItem("mobile_token");
+  await AsyncStorage.removeItem("isLogged");
+  await AsyncStorage.removeItem("user");
+  router.replace("/auth/login");
+};
+
+useEffect(() => {
+  const checkAuth = async () => {
+    const isLogged = await AsyncStorage.getItem("isLogged");
+    if (isLogged !== "true") {
+      router.replace("/auth/login");
+    }
   };
+  checkAuth();
+}, []);
+
+useEffect(() => {
+  const fetchUserData = async () => {
+    const raw = await AsyncStorage.getItem("userData");
+    const parsed = JSON.parse(raw || "{}");
+    setUserData(parsed);
+  };
+  fetchUserData();
+}, []);
+
+if (!userData) {
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <Text>Chargement...</Text>
+    </View>
+  );
+}
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? "#0d0d0d" : "#fff" }]}>
       
@@ -28,9 +55,9 @@ export default function Settings() {
         />
         <View>
           <Text style={[styles.name, { color: isDark ? "#fff" : "#000" }]}>
-            Mohamed Diouf
+            {userData.full_name}
           </Text>
-          <Text style={styles.mail}>mohamed@example.com</Text>
+          <Text style={styles.mail}>{userData.email}</Text>
         </View>
       </View>
 

@@ -51,7 +51,9 @@ export default function Login() {
 
       await AsyncStorage.setItem("isLogged", "true");
       await AsyncStorage.setItem("mobile_token", data.mobile_token);
-
+      await AsyncStorage.setItem("userData", JSON.stringify(data.user));
+      console.log(data.user);
+      
       router.replace("/(tabs)");
     } catch (error) {
       console.log(error);
