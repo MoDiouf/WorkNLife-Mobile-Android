@@ -50,6 +50,7 @@ interface Trip {
   };
   seats: string;
   keyPlaces: string[];
+  etat:string
 }
 export default function Convoiturage() {
   const scheme = useColorScheme();
@@ -95,7 +96,7 @@ export default function Convoiturage() {
 
         if (response.ok) {
           const backendData = await response.json();
-          //console.log(backendData);
+          console.log(backendData);
 
           const trips = backendData.map((trip: any) => ({
             idCarpool: trip.id_carpool,
@@ -108,12 +109,16 @@ export default function Convoiturage() {
             driver: {
               name: trip.driver.full_name,
               rating: 4.5, // valeur par défaut si non fournie
-              avatar: require("../../assets/images/profile_WNL.jpg"), // valeur par défaut
+              avatar: trip.driver.profile_picture
+                ? { uri: `data:image/jpeg;base64,${trip.driver.profile_picture}` }
+                : require("../../assets/images/image.png"),
+
             },
             seats: `${trip.available_seats} places`,
             keyPlaces: trip.key_points || [],
+            etat: trip.status.toUpperCase(),
           }));
-          //console.log(trips);
+          //console.log("trips",trips);
 
           setCarpool(trips);
         }
@@ -430,6 +435,7 @@ useEffect(() => {
         setPointsCles("");
         setPlaces("");
         setPrix("");
+        Convoiturage()
       }
     } catch (error) {
       Alert.alert("Erreur", "Impossible de publier le trajet");
@@ -447,7 +453,7 @@ useEffect(() => {
 
       return matchFrom && matchTo;
     });
-
+    
     setFilteredCarpool(results);
   }, [from, to, carpool]);
 
@@ -463,7 +469,7 @@ useEffect(() => {
 
   const handleConfirmReservation = async () => {
     if (!selectedTrip) return;
-    console.log("Test", selectedTrip.idCarpool);
+    console.log("Test", selectedTrip);
     const token = await AsyncStorage.getItem("mobile_token");
     try {
       const response = await fetch(
@@ -535,7 +541,61 @@ useEffect(() => {
       console.log("Erreur réponse trajet:", error);
     }
   };
-  console.log("", filteredCarpool);
+  //console.log("filterd", filteredCarpool);
+  const [modalCarpoolVisible, setModalCarpoolVisible] = useState(false);
+const [selectedCarpool, setSelectedCarpool] = useState<any | null>(null);
+
+  const handleLongPress = (carpool: any) => {
+  setSelectedCarpool(carpool);
+  setModalCarpoolVisible(true);
+};
+
+const startCarpool = async (id:number,status:string) => {
+  try {
+    const response = await fetch(`http://192.168.1.18:3000/carpools/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${await AsyncStorage.getItem("mobile_token")}`,
+      },
+      body: JSON.stringify({ id_carpool: id, status: status }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.message);
+
+    alert(`Trajet ${status === "en_cours" ? "démarré" : "terminé"} !`);
+  } catch (error) {
+    console.error(error);
+    alert("Erreur : impossible de démarrer le trajet");
+  }
+};
+
+const deleteCarpool = async (id:number) => {
+  //console.log("Id recuperer",id);
+  
+  try {
+    const response = await fetch(`http://192.168.1.18:3000/carpools/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${await AsyncStorage.getItem("mobile_token")}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.message);
+
+    alert("Trajet supprimé !");
+    Convoiturage();
+  } catch (error) {
+    console.error(error);
+    alert("Erreur : impossible de supprimer le trajet");
+  }
+};
+
 
   return (
     <ScrollView
@@ -1069,6 +1129,57 @@ useEffect(() => {
           </View>
         </View>
       </Modal>
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={modalCarpoolVisible}
+  onRequestClose={() => setModalCarpoolVisible(false)}
+>
+  <View style={styles.customModalOverlay}>
+    <View style={styles.customModalBox}>
+      <Text style={styles.customModalTitle}>Actions sur le trajet</Text>
+      <Text style={styles.customModalSubtitle}>Que veux-tu faire ?</Text>
+
+      <TouchableOpacity
+        style={styles.customModalButton}
+        onPress={() => {
+          if (selectedCarpool) startCarpool(selectedCarpool.idCarpool, "en_cours");
+          setModalCarpoolVisible(false);
+        }}
+      >
+        <Text style={styles.customModalButtonText}>Démarrer</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.customModalButton, styles.customModalButtonRed]}
+        onPress={() => {
+          if (selectedCarpool) deleteCarpool(selectedCarpool.idCarpool);
+          setModalCarpoolVisible(false);
+        }}
+      >
+        <Text style={styles.customModalButtonText}>Supprimer</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.customModalButton}
+        onPress={() => {
+          if (selectedCarpool) startCarpool(selectedCarpool.idCarpool, "terminé");
+          setModalCarpoolVisible(false);
+        }}
+      >
+        <Text style={styles.customModalButtonText}>Terminer</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.customModalButton, styles.customModalButtonGray]}
+        onPress={() => setModalCarpoolVisible(false)}
+      >
+        <Text style={styles.customModalButtonText}>Annuler</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
 
       {/* Header */}
       <View style={styles.header}>
@@ -1204,7 +1315,9 @@ useEffect(() => {
           {/* Trajets disponibles */}
           {(filteredCarpool.length > 0 ? filteredCarpool : carpool).map(
             (item, index) => (
-              <View
+              <TouchableOpacity
+              onLongPress={(event) => handleLongPress(item)}
+              delayLongPress={200}
                 key={index}
                 style={[
                   styles.tripCard,
@@ -1262,14 +1375,19 @@ useEffect(() => {
                     <Text style={styles.seats}>{item.seats}</Text>
 
                     <TouchableOpacity
-                      style={styles.reserveButton}
-                      onPress={() => openModal(item)}
-                    >
-                      <Text style={styles.reserveButtonText}>Réserver</Text>
-                    </TouchableOpacity>
+  style={[
+    styles.reserveButton,
+    item.etat === "EN_COURS" ? { backgroundColor: "grey" } : {},
+  ]}
+  onPress={() => item.etat !== "EN_COURS" && openModal(item)}
+  disabled={item.etat === "EN_COURS"} // désactive le bouton si le carpool est en cours
+>
+  <Text style={styles.reserveButtonText}>Réserver</Text>
+</TouchableOpacity>
+
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             )
           )}
 
@@ -1881,5 +1999,68 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 16,
+  },
+  customModalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+
+  // Conteneur principal du modal
+  customModalBox: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+
+  // Titre du modal
+  customModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
+  },
+
+  // Sous-titre / description
+  customModalSubtitle: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+
+  // Boutons d'action du modal
+  customModalButton: {
+    width: "100%",
+    paddingVertical: 12,
+    backgroundColor: "#007bff", // bleu par défaut
+    borderRadius: 10,
+    marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Boutons spécifiques avec couleur
+  customModalButtonRed: {
+    backgroundColor: "#e53935", // rouge
+  },
+
+  customModalButtonGray: {
+    backgroundColor: "#b0b0b0", // gris
+  },
+
+  customModalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

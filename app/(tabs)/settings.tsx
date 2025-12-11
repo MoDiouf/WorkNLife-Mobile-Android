@@ -43,6 +43,7 @@ if (!userData) {
     </View>
   );
 }
+//console.log("L'utilsateur",userData);
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? "#0d0d0d" : "#fff" }]}>
@@ -50,7 +51,11 @@ if (!userData) {
       {/* Profil */}
       <View style={styles.profileContainer}>
         <Image
-          source={require("../../assets/images/profile_WNL.jpg")}
+          source={
+    userData.profile_picture
+      ? { uri: `data:image/jpeg;base64,${userData.profile_picture}` }
+      : require("../../assets/images/image.png")
+  }
           style={styles.avatar}
         />
         <View>
