@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import DatePicker from "react-native-date-picker";
 import { io, Socket } from "socket.io-client";
+import AlertModal from "@/components/AlertModal";
 
 const { width } = Dimensions.get("window");
 interface BackendDriver {
@@ -50,7 +51,8 @@ interface Trip {
   };
   seats: string;
   keyPlaces: string[];
-  etat:string
+  etat: string;
+  driver_id:number
 }
 export default function Convoiturage() {
   const scheme = useColorScheme();
@@ -80,53 +82,71 @@ export default function Convoiturage() {
   const socketRef = useRef<Socket | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "info">(
+    "info"
+  );
+  const [pickupPoint, setPickupPoint] = useState<string>("");
+  const [user, setUser] = useState<any>(null);
+  const showAlert = (type: "success" | "error" | "info", message: string) => {
+    setAlertType(type);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+  const fetchCovoiturage = async () => {
+    try {
+      const token = await AsyncStorage.getItem("mobile_token");
 
-  useEffect(() => {
-    const fetchCovoiturage = async () => {
-      try {
-        const token = await AsyncStorage.getItem("mobile_token");
+      const response = await fetch("http://192.168.1.18:3000/carpools", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        const response = await fetch("http://192.168.1.18:3000/carpools", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+      if (response.ok) {
+        const backendData = await response.json();
+        //console.log("All",backendData);
+
+        const trips = backendData.map((trip: any) => ({
+          idCarpool: trip.id_carpool,
+          from: trip.start_point,
+          to: trip.end_point,
+          date: formatDateLabel(trip.departure_time),
+          time: formatTime(trip.departure_time),
+          duration: "À définir", // non fourni par le backend
+          price: `${trip.price_per_seat} FCFA`,
+          driver: {
+            name: trip.driver.full_name,
+            rating: 4.5, // valeur par défaut si non fournie
+            avatar: trip.driver.profile_picture
+              ? { uri: `data:image/jpeg;base64,${trip.driver.profile_picture}` }
+              : require("../../assets/images/image.png"),
           },
-        });
+          seats: `${trip.available_seats} places`,
+          keyPlaces: trip.key_points || [],
+          etat: trip.status.toUpperCase(),
+          driver_id: trip.driver_id
+        }));
+        //console.log("trips",trips);
 
-        if (response.ok) {
-          const backendData = await response.json();
-          console.log(backendData);
-
-          const trips = backendData.map((trip: any) => ({
-            idCarpool: trip.id_carpool,
-            from: trip.start_point,
-            to: trip.end_point,
-            date: formatDateLabel(trip.departure_time),
-            time: formatTime(trip.departure_time),
-            duration: "À définir", // non fourni par le backend
-            price: `${trip.price_per_seat} FCFA`,
-            driver: {
-              name: trip.driver.full_name,
-              rating: 4.5, // valeur par défaut si non fournie
-              avatar: trip.driver.profile_picture
-                ? { uri: `data:image/jpeg;base64,${trip.driver.profile_picture}` }
-                : require("../../assets/images/image.png"),
-
-            },
-            seats: `${trip.available_seats} places`,
-            keyPlaces: trip.key_points || [],
-            etat: trip.status.toUpperCase(),
-          }));
-          //console.log("trips",trips);
-
-          setCarpool(trips);
-        }
-      } catch (error) {
-        console.log("Erreur fetch carpool:", error);
+        setCarpool(trips);
       }
-    };
-
+    } catch (error) {
+      console.log("Erreur fetch carpool:", error);
+    }
+  };
+  useEffect(() => {
+    const fetchUserData = async () => {
+    const raw = await AsyncStorage.getItem("userData");
+    const parsed = JSON.parse(raw || "{}");
+    console.log(user);
+    
+    setUser(parsed);
+  };
+    fetchUserData();
     fetchCovoiturage();
   }, []);
   const SOCKET_URL = "http://192.168.1.18:3000";
@@ -211,16 +231,16 @@ export default function Convoiturage() {
 
     loadRequests();
   }, []);
-useEffect(() => {
-  if (rideRequests.length > 0) {
-    const pending = rideRequests.filter(req => req.status === "en_attente");
+  useEffect(() => {
+    if (rideRequests.length > 0) {
+      const pending = rideRequests.filter((req) => req.status === "en_attente");
 
-    if (pending.length > 0) {
-      setSelectedRequest(pending[pending.length - 1]);
-      setIsModalVisible(true);
+      if (pending.length > 0) {
+        setSelectedRequest(pending[pending.length - 1]);
+        setIsModalVisible(true);
+      }
     }
-  }
-}, [rideRequests]);
+  }, [rideRequests]);
 
   const formatTime = (isoDate: string): string => {
     const date = new Date(isoDate);
@@ -271,7 +291,7 @@ useEffect(() => {
       }
 
       const data = await response.json();
-      //console.log("Retour: ", data);
+      console.log("Retour: ", data);
 
       if (data.allowed === true) {
         setHasCreatePermission(true);
@@ -280,8 +300,8 @@ useEffect(() => {
         setShowVerifyModal(true);
       }
     } catch (error) {
-      console.log("Erreur permission:", error);
-      alert("❌ Accès refusé. Contactez l'administrateur.");
+      //console.log("Erreur permission:", error);
+      showAlert("error", "❌ Erreur lors de la vérification des permissions");
     } finally {
       setCheckingPermission(false);
     }
@@ -345,8 +365,8 @@ useEffect(() => {
         setSelectedDoc(null);
       } else {
         const errorText = await response.text();
-        console.error("Erreur serveur:", errorText);
-        alert("❌ Erreur lors de l'envoi du document");
+        //console.error("Erreur serveur:", errorText);
+        showAlert("error", "❌ Échec de l'envoi du document");
       }
     } catch (err) {
       console.log(err);
@@ -386,16 +406,16 @@ useEffect(() => {
         return;
       }
     } catch (error) {
-      Alert.alert(
-        "Erreur",
-        "Format de date invalide. Utilisez AAAA-MM-JJ HH:MM"
-      );
+      showAlert("error", "Format de date invalide. Utilisez AAAA-MM-JJ HH:MM");
       return;
     }
 
     // Vérifier que la date n'est pas passée
     if (departureDateTime < new Date()) {
-      Alert.alert("Erreur", "La date de départ ne peut pas être dans le passé");
+      showAlert(
+        "error",
+        "La date et l'heure de départ doivent être dans le futur"
+      );
       return;
     }
 
@@ -426,19 +446,27 @@ useEffect(() => {
         body: JSON.stringify(trajet),
       });
 
-      if (response.ok) {
-        Alert.alert("Succès", "Trajet publié !");
-        // Réinitialiser
-        setDepart("");
-        setArrivee("");
-        setDateInput("");
-        setPointsCles("");
-        setPlaces("");
-        setPrix("");
-        Convoiturage()
+      if (!response.ok) {
+        // Si le serveur renvoie une erreur
+        const errorText = await response.text();
+        showAlert("error", `Erreur serveur : ${errorText}`);
+        return;
       }
+
+      fetchCovoiturage();
+      showAlert("success", "Trajet publié avec succès !");
+
+      // 🔹 Réinitialisation des champs
+      setDepart("");
+      setArrivee("");
+      setDateInput("");
+      setPointsCles("");
+      setPlaces("");
+      setPrix("");
     } catch (error) {
-      Alert.alert("Erreur", "Impossible de publier le trajet");
+      // 🔹 Erreur réseau
+      showAlert("error", "Erreur réseau, veuillez réessayer");
+      console.error(error);
     }
   };
   useEffect(() => {
@@ -453,7 +481,7 @@ useEffect(() => {
 
       return matchFrom && matchTo;
     });
-    
+
     setFilteredCarpool(results);
   }, [from, to, carpool]);
 
@@ -482,6 +510,7 @@ useEffect(() => {
           },
           body: JSON.stringify({
             idCarpool: selectedTrip.idCarpool,
+            pickup_point: pickupPoint,
           }),
         }
       );
@@ -492,11 +521,14 @@ useEffect(() => {
         throw new Error(data.message || "Erreur lors de la demande");
       }
 
-      alert("✅ Demande envoyée avec succès !");
+      showAlert("success", "Demande de réservation envoyée avec succès !");
       setModalVisible(false);
     } catch (error) {
       console.error("Erreur réservation :", error);
-      alert("❌ Échec de l'envoi de la demande");
+      showAlert(
+        "error",
+        "Erreur lors de la réservation du trajet ou covoiturage deja pleine"
+      );
     }
   };
   const respondToRequest = async (status: any) => {
@@ -530,409 +562,217 @@ useEffect(() => {
       const data = await res.json();
 
       // ✅ Supprimer la demande de la liste après réponse
-      setRideRequests(prev =>
-  prev.filter(r => r.id_request !== selectedRequest.id_request)
-);
+      setRideRequests((prev) =>
+        prev.filter((r) => r.id_request !== selectedRequest.id_request)
+      );
 
       setIsModalVisible(false);
 
-      alert(status === "accepte" ? "✅ Trajet accepté" : "❌ Trajet refusé");
+      showAlert(
+        "success",
+        `Demande ${status === "accepte" ? "acceptée" : "refusée"} avec succès !`
+      );
     } catch (error) {
       console.log("Erreur réponse trajet:", error);
     }
   };
   //console.log("filterd", filteredCarpool);
   const [modalCarpoolVisible, setModalCarpoolVisible] = useState(false);
-const [selectedCarpool, setSelectedCarpool] = useState<any | null>(null);
+  const [selectedCarpool, setSelectedCarpool] = useState<any | null>(null);
 
   const handleLongPress = (carpool: any) => {
-  setSelectedCarpool(carpool);
-  setModalCarpoolVisible(true);
-};
+    setSelectedCarpool(carpool);
+    setModalCarpoolVisible(true);
+  };
+  const startCarpool = async (id: number, status: string) => {
+    try {
+      const response = await fetch(`http://192.168.1.18:3000/carpools/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await AsyncStorage.getItem("mobile_token")}`,
+        },
+        body: JSON.stringify({ id_carpool: id, status: status }),
+      });
 
-const startCarpool = async (id:number,status:string) => {
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.message);
+      fetchCovoiturage();
+      showAlert(
+        "success",
+        `Trajet ${status === "en_cours" ? "démarré" : "terminé"} avec succès !`
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Erreur : impossible de démarrer le trajet");
+    }
+  };
+
+  const deleteCarpool = async (id: number) => {
+    //console.log("Id recuperer",id);
+
+    try {
+      const response = await fetch(`http://192.168.1.18:3000/carpools/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await AsyncStorage.getItem("mobile_token")}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.message);
+
+      showAlert("success", "Trajet supprimé avec succès !");
+    } catch (error) {
+      console.error(error);
+      alert("Erreur : impossible de supprimer le trajet");
+    }
+  };
+  const [acceptedModalVisible, setAcceptedModalVisible] = useState(false);
+const [acceptedRequests, setAcceptedRequests] = useState([]);
+
+const openAcceptedModal = async (trip:any) => {
   try {
-    const response = await fetch(`http://192.168.1.18:3000/carpools/status`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${await AsyncStorage.getItem("mobile_token")}`,
-      },
-      body: JSON.stringify({ id_carpool: id, status: status }),
-    });
-
+    const token = await AsyncStorage.getItem("mobile_token");
+    const response = await fetch(
+      `http://192.168.1.18:3000/carpools/accepted-requests/${trip.id}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
     const data = await response.json();
-
-    if (!response.ok) throw new Error(data.message);
-
-    alert(`Trajet ${status === "en_cours" ? "démarré" : "terminé"} !`);
-  } catch (error) {
-    console.error(error);
-    alert("Erreur : impossible de démarrer le trajet");
+    setAcceptedRequests(data);
+    setAcceptedModalVisible(true);
+  } catch (err) {
+    console.error(err);
+    showAlert("error", "Impossible de récupérer les réservations acceptées");
   }
 };
-
-const deleteCarpool = async (id:number) => {
-  //console.log("Id recuperer",id);
-  
-  try {
-    const response = await fetch(`http://192.168.1.18:3000/carpools/${id}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${await AsyncStorage.getItem("mobile_token")}`,
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) throw new Error(data.message);
-
-    alert("Trajet supprimé !");
-    Convoiturage();
-  } catch (error) {
-    console.error(error);
-    alert("Erreur : impossible de supprimer le trajet");
-  }
-};
-
 
   return (
-    <ScrollView
-      style={[
-        styles.container,
-        { backgroundColor: isDark ? "#0d0d0d" : "#ffffff" },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Modal de vérification */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showVerifyModal}
-        onRequestClose={() => setShowVerifyModal(false)}
+    <>
+      <ScrollView
+        style={[
+          styles.container,
+          { backgroundColor: isDark ? "#0d0d0d" : "#ffffff" },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.modalOverlay}>
-          <ScrollView
-            style={styles.modalScroll}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.modalScrollContent}
-          >
-            <View
-              style={[
-                styles.modalContent,
-                { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
-              ]}
+        {/* Modal de vérification */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showVerifyModal}
+          onRequestClose={() => setShowVerifyModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
             >
-              {/* En-tête */}
-              <View style={styles.modalHeader}>
-                <Text
-                  style={[
-                    styles.modalTitle,
-                    { color: isDark ? "#fff" : "#000" },
-                  ]}
-                >
-                  Vérification du profil
-                </Text>
-                <Text
-                  style={[
-                    styles.modalSubtitle,
-                    { color: isDark ? "#ccc" : "#666" },
-                  ]}
-                >
-                  Pour créer des trajets, vous devez vérifier votre identité
-                </Text>
-              </View>
-
-              {/* Documents requis */}
-              <View style={styles.documentsSection}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: isDark ? "#fff" : "#000" },
-                  ]}
-                >
-                  Documents traités :
-                </Text>
-
-                <View style={styles.documentItem}>
-                  <View style={styles.documentIconContainer}>
-                    <Ionicons name="card" size={20} color="#1041b3" />
-                  </View>
-                  <View style={styles.documentInfo}>
-                    <Text
-                      style={[
-                        styles.documentTitle,
-                        { color: isDark ? "#fff" : "#000" },
-                      ]}
-                    >
-                      Carte Nationale d'Identité (CNI)
-                    </Text>
-                    <Text
-                      style={[
-                        styles.documentDesc,
-                        { color: isDark ? "#aaa" : "#666" },
-                      ]}
-                    >
-                      Recto et verso bien visibles
-                    </Text>
-                  </View>
-                  <View
+              <View
+                style={[
+                  styles.modalContent,
+                  { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
+                ]}
+              >
+                {/* En-tête */}
+                <View style={styles.modalHeader}>
+                  <Text
                     style={[
-                      styles.documentStatus,
-                      {
-                        backgroundColor:
-                          selectedDoc?.type === "cni" ? "#4ade80" : "#e5e5e5",
-                      },
+                      styles.modalTitle,
+                      { color: isDark ? "#fff" : "#000" },
                     ]}
                   >
-                    <Text style={styles.documentStatusText}>
-                      {selectedDoc?.type === "cni" ? "✓" : "1"}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.documentItem}>
-                  <View style={styles.documentIconContainer}>
-                    <Ionicons name="car" size={20} color="#1041b3" />
-                  </View>
-                  <View style={styles.documentInfo}>
-                    <Text
-                      style={[
-                        styles.documentTitle,
-                        { color: isDark ? "#fff" : "#000" },
-                      ]}
-                    >
-                      Permis de conduire
-                    </Text>
-                    <Text
-                      style={[
-                        styles.documentDesc,
-                        { color: isDark ? "#aaa" : "#666" },
-                      ]}
-                    >
-                      Recto et verso bien visibles
-                    </Text>
-                  </View>
-                  <View
+                    Vérification du profil
+                  </Text>
+                  <Text
                     style={[
-                      styles.documentStatus,
-                      {
-                        backgroundColor:
-                          selectedDoc?.type === "permis"
-                            ? "#4ade80"
-                            : "#e5e5e5",
-                      },
+                      styles.modalSubtitle,
+                      { color: isDark ? "#ccc" : "#666" },
                     ]}
                   >
-                    <Text style={styles.documentStatusText}>
-                      {selectedDoc?.type === "permis" ? "✓" : "2"}
-                    </Text>
-                  </View>
+                    Pour créer des trajets, vous devez vérifier votre identité
+                  </Text>
                 </View>
-              </View>
 
-              {/* Sélection du document */}
-              <View style={styles.selectionSection}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: isDark ? "#fff" : "#000", marginBottom: 12 },
-                  ]}
-                >
-                  Choisir un document à envoyer :
-                </Text>
-
-                <View style={styles.documentButtonsContainer}>
-                  <View style={styles.documentButtons}>
-                    <TouchableOpacity
-                      style={[
-                        styles.documentButton,
-                        {
-                          backgroundColor:
-                            selectedDoc?.type === "cni"
-                              ? "rgba(16, 65, 179, 0.2)"
-                              : isDark
-                              ? "#2a2a2a"
-                              : "#f5f5f5",
-                          borderColor:
-                            selectedDoc?.type === "cni"
-                              ? "#1041b3"
-                              : "transparent",
-                        },
-                      ]}
-                      onPress={() => handleDocumentPick("cni")}
-                    >
-                      <View
-                        style={[
-                          styles.documentButtonIcon,
-                          { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
-                        ]}
-                      >
-                        <Ionicons name="card" size={24} color="#1041b3" />
-                      </View>
-                      <Text
-                        style={[
-                          styles.documentButtonText,
-                          { color: isDark ? "#fff" : "#000" },
-                        ]}
-                      >
-                        Carte CNI
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.documentButton,
-                        {
-                          backgroundColor:
-                            selectedDoc?.type === "permis"
-                              ? "rgba(16, 65, 179, 0.2)"
-                              : isDark
-                              ? "#2a2a2a"
-                              : "#f5f5f5",
-                          borderColor:
-                            selectedDoc?.type === "permis"
-                              ? "#1041b3"
-                              : "transparent",
-                        },
-                      ]}
-                      onPress={() => handleDocumentPick("permis")}
-                    >
-                      <View
-                        style={[
-                          styles.documentButtonIcon,
-                          { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
-                        ]}
-                      >
-                        <Ionicons name="car" size={24} color="#1041b3" />
-                      </View>
-                      <Text
-                        style={[
-                          styles.documentButtonText,
-                          { color: isDark ? "#fff" : "#000" },
-                        ]}
-                      >
-                        Permis
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-
-              {/* Document sélectionné */}
-              {selectedDoc && (
-                <View style={styles.selectedDocumentsSection}>
+                {/* Documents requis */}
+                <View style={styles.documentsSection}>
                   <Text
                     style={[
                       styles.sectionTitle,
-                      { color: isDark ? "#fff" : "#000", marginBottom: 10 },
+                      { color: isDark ? "#fff" : "#000" },
                     ]}
                   >
-                    Document sélectionné :
+                    Documents traités :
                   </Text>
 
-                  <View
-                    style={[
-                      styles.documentCard,
-                      { backgroundColor: isDark ? "#2a2a2a" : "#f8f8f8" },
-                    ]}
-                  >
-                    <View style={styles.documentCardHeader}>
-                      <View style={styles.documentCardIcon}>
-                        <Ionicons
-                          name={selectedDoc.type === "cni" ? "card" : "car"}
-                          size={24}
-                          color="#1041b3"
-                        />
-                      </View>
-                      <View style={styles.documentCardInfo}>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={[
-                              styles.documentCardTitle,
-                              { color: isDark ? "#fff" : "#000" },
-                            ]}
-                          >
-                            {selectedDoc.label}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.documentCardName,
-                              { color: isDark ? "#aaa" : "#666" },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {selectedDoc.name}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.documentCardSize,
-                            { color: isDark ? "#888" : "#888" },
-                          ]}
-                        >
-                          {(selectedDoc.size / 1024).toFixed(1)} KB
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => setSelectedDoc(null)}
-                        style={styles.removeButton}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={24}
-                          color="#ef4444"
-                        />
-                      </TouchableOpacity>
+                  <View style={styles.documentItem}>
+                    <View style={styles.documentIconContainer}>
+                      <Ionicons name="card" size={20} color="#1041b3" />
                     </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Statut des documents */}
-              <View style={styles.documentsList}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: isDark ? "#fff" : "#000", marginBottom: 10 },
-                  ]}
-                >
-                  Documents à envoyer :
-                </Text>
-
-                <View style={styles.documentsStatus}>
-                  <View style={styles.statusItem}>
+                    <View style={styles.documentInfo}>
+                      <Text
+                        style={[
+                          styles.documentTitle,
+                          { color: isDark ? "#fff" : "#000" },
+                        ]}
+                      >
+                        Carte Nationale d'Identité (CNI)
+                      </Text>
+                      <Text
+                        style={[
+                          styles.documentDesc,
+                          { color: isDark ? "#aaa" : "#666" },
+                        ]}
+                      >
+                        Recto et verso bien visibles
+                      </Text>
+                    </View>
                     <View
                       style={[
-                        styles.statusIndicator,
+                        styles.documentStatus,
                         {
                           backgroundColor:
                             selectedDoc?.type === "cni" ? "#4ade80" : "#e5e5e5",
                         },
                       ]}
                     >
-                      <Text style={styles.statusText}>
+                      <Text style={styles.documentStatusText}>
                         {selectedDoc?.type === "cni" ? "✓" : "1"}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.statusLabel,
-                        { color: isDark ? "#fff" : "#000" },
-                      ]}
-                    >
-                      CNI{" "}
-                      {selectedDoc?.type === "cni"
-                        ? "(Sélectionné)"
-                        : "(Manquant)"}
-                    </Text>
                   </View>
 
-                  <View style={styles.statusItem}>
+                  <View style={styles.documentItem}>
+                    <View style={styles.documentIconContainer}>
+                      <Ionicons name="car" size={20} color="#1041b3" />
+                    </View>
+                    <View style={styles.documentInfo}>
+                      <Text
+                        style={[
+                          styles.documentTitle,
+                          { color: isDark ? "#fff" : "#000" },
+                        ]}
+                      >
+                        Permis de conduire
+                      </Text>
+                      <Text
+                        style={[
+                          styles.documentDesc,
+                          { color: isDark ? "#aaa" : "#666" },
+                        ]}
+                      >
+                        Recto et verso bien visibles
+                      </Text>
+                    </View>
                     <View
                       style={[
-                        styles.statusIndicator,
+                        styles.documentStatus,
                         {
                           backgroundColor:
                             selectedDoc?.type === "permis"
@@ -941,579 +781,845 @@ const deleteCarpool = async (id:number) => {
                         },
                       ]}
                     >
-                      <Text style={styles.statusText}>
+                      <Text style={styles.documentStatusText}>
                         {selectedDoc?.type === "permis" ? "✓" : "2"}
                       </Text>
                     </View>
+                  </View>
+                </View>
+
+                {/* Sélection du document */}
+                <View style={styles.selectionSection}>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: isDark ? "#fff" : "#000", marginBottom: 12 },
+                    ]}
+                  >
+                    Choisir un document à envoyer :
+                  </Text>
+
+                  <View style={styles.documentButtonsContainer}>
+                    <View style={styles.documentButtons}>
+                      <TouchableOpacity
+                        style={[
+                          styles.documentButton,
+                          {
+                            backgroundColor:
+                              selectedDoc?.type === "cni"
+                                ? "rgba(16, 65, 179, 0.2)"
+                                : isDark
+                                ? "#2a2a2a"
+                                : "#f5f5f5",
+                            borderColor:
+                              selectedDoc?.type === "cni"
+                                ? "#1041b3"
+                                : "transparent",
+                          },
+                        ]}
+                        onPress={() => handleDocumentPick("cni")}
+                      >
+                        <View
+                          style={[
+                            styles.documentButtonIcon,
+                            { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
+                          ]}
+                        >
+                          <Ionicons name="card" size={24} color="#1041b3" />
+                        </View>
+                        <Text
+                          style={[
+                            styles.documentButtonText,
+                            { color: isDark ? "#fff" : "#000" },
+                          ]}
+                        >
+                          Carte CNI
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.documentButton,
+                          {
+                            backgroundColor:
+                              selectedDoc?.type === "permis"
+                                ? "rgba(16, 65, 179, 0.2)"
+                                : isDark
+                                ? "#2a2a2a"
+                                : "#f5f5f5",
+                            borderColor:
+                              selectedDoc?.type === "permis"
+                                ? "#1041b3"
+                                : "transparent",
+                          },
+                        ]}
+                        onPress={() => handleDocumentPick("permis")}
+                      >
+                        <View
+                          style={[
+                            styles.documentButtonIcon,
+                            { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
+                          ]}
+                        >
+                          <Ionicons name="car" size={24} color="#1041b3" />
+                        </View>
+                        <Text
+                          style={[
+                            styles.documentButtonText,
+                            { color: isDark ? "#fff" : "#000" },
+                          ]}
+                        >
+                          Permis
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Document sélectionné */}
+                {selectedDoc && (
+                  <View style={styles.selectedDocumentsSection}>
                     <Text
                       style={[
-                        styles.statusLabel,
+                        styles.sectionTitle,
+                        { color: isDark ? "#fff" : "#000", marginBottom: 10 },
+                      ]}
+                    >
+                      Document sélectionné :
+                    </Text>
+
+                    <View
+                      style={[
+                        styles.documentCard,
+                        { backgroundColor: isDark ? "#2a2a2a" : "#f8f8f8" },
+                      ]}
+                    >
+                      <View style={styles.documentCardHeader}>
+                        <View style={styles.documentCardIcon}>
+                          <Ionicons
+                            name={selectedDoc.type === "cni" ? "card" : "car"}
+                            size={24}
+                            color="#1041b3"
+                          />
+                        </View>
+                        <View style={styles.documentCardInfo}>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={[
+                                styles.documentCardTitle,
+                                { color: isDark ? "#fff" : "#000" },
+                              ]}
+                            >
+                              {selectedDoc.label}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.documentCardName,
+                                { color: isDark ? "#aaa" : "#666" },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {selectedDoc.name}
+                            </Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.documentCardSize,
+                              { color: isDark ? "#888" : "#888" },
+                            ]}
+                          >
+                            {(selectedDoc.size / 1024).toFixed(1)} KB
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => setSelectedDoc(null)}
+                          style={styles.removeButton}
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={24}
+                            color="#ef4444"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Statut des documents */}
+                <View style={styles.documentsList}>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: isDark ? "#fff" : "#000", marginBottom: 10 },
+                    ]}
+                  >
+                    Documents à envoyer :
+                  </Text>
+
+                  <View style={styles.documentsStatus}>
+                    <View style={styles.statusItem}>
+                      <View
+                        style={[
+                          styles.statusIndicator,
+                          {
+                            backgroundColor:
+                              selectedDoc?.type === "cni"
+                                ? "#4ade80"
+                                : "#e5e5e5",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.statusText}>
+                          {selectedDoc?.type === "cni" ? "✓" : "1"}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.statusLabel,
+                          { color: isDark ? "#fff" : "#000" },
+                        ]}
+                      >
+                        CNI{" "}
+                        {selectedDoc?.type === "cni"
+                          ? "(Sélectionné)"
+                          : "(Manquant)"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.statusItem}>
+                      <View
+                        style={[
+                          styles.statusIndicator,
+                          {
+                            backgroundColor:
+                              selectedDoc?.type === "permis"
+                                ? "#4ade80"
+                                : "#e5e5e5",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.statusText}>
+                          {selectedDoc?.type === "permis" ? "✓" : "2"}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.statusLabel,
+                          { color: isDark ? "#fff" : "#000" },
+                        ]}
+                      >
+                        Permis{" "}
+                        {selectedDoc?.type === "permis"
+                          ? "(Sélectionné)"
+                          : "(Manquant)"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Boutons d'action */}
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.primaryButton,
+                      { opacity: !selectedDoc || uploading ? 0.6 : 1 },
+                    ]}
+                    onPress={handleUpload}
+                    disabled={!selectedDoc || uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Ionicons
+                          name="refresh"
+                          size={20}
+                          color="#fff"
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={styles.primaryButtonText}>
+                          Envoi en cours...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="cloud-upload"
+                          size={20}
+                          color="#fff"
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={styles.primaryButtonText}>
+                          Envoyer{" "}
+                          {selectedDoc?.type === "cni" ? "la CNI" : "le permis"}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.secondaryButton,
+                      { backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5" },
+                    ]}
+                    onPress={() => {
+                      setShowVerifyModal(false);
+                      setSelectedDoc(null);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
                         { color: isDark ? "#fff" : "#000" },
                       ]}
                     >
-                      Permis{" "}
-                      {selectedDoc?.type === "permis"
-                        ? "(Sélectionné)"
-                        : "(Manquant)"}
+                      Fermer
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
-              </View>
 
-              {/* Boutons d'action */}
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.primaryButton,
-                    { opacity: !selectedDoc || uploading ? 0.6 : 1 },
-                  ]}
-                  onPress={handleUpload}
-                  disabled={!selectedDoc || uploading}
-                >
-                  {uploading ? (
-                    <>
-                      <Ionicons
-                        name="refresh"
-                        size={20}
-                        color="#fff"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text style={styles.primaryButtonText}>
-                        Envoi en cours...
+                {/* Note d'information */}
+                {selectedDoc ? (
+                  <View />
+                ) : (
+                  <View style={styles.infoNote}>
+                    <Ionicons
+                      name="information-circle"
+                      size={16}
+                      color="#888"
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.infoText,
+                          { color: isDark ? "#aaa" : "#666" },
+                        ]}
+                      >
+                        <Text style={{ fontWeight: "600" }}>Important :</Text>{" "}
+                        Assurez-vous que les photos sont nettes et bien
+                        lisibles.
                       </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="cloud-upload"
-                        size={20}
-                        color="#fff"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text style={styles.primaryButtonText}>
-                        Envoyer{" "}
-                        {selectedDoc?.type === "cni" ? "la CNI" : "le permis"}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.secondaryButton,
-                    { backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5" },
-                  ]}
-                  onPress={() => {
-                    setShowVerifyModal(false);
-                    setSelectedDoc(null);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.secondaryButtonText,
-                      { color: isDark ? "#fff" : "#000" },
-                    ]}
-                  >
-                    Fermer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Note d'information */}
-              {selectedDoc ? (
-                <View />
-              ) : (
-                <View style={styles.infoNote}>
-                  <Ionicons name="information-circle" size={16} color="#888" />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.infoText,
-                        { color: isDark ? "#aaa" : "#666" },
-                      ]}
-                    >
-                      <Text style={{ fontWeight: "600" }}>Important :</Text>{" "}
-                      Assurez-vous que les photos sont nettes et bien lisibles.
-                    </Text>
+                    </View>
                   </View>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </Modal>
+        <Modal
+          visible={isModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsModalVisible(false)}
         >
           <View
             style={{
-              backgroundColor: "#fff",
-              width: "90%",
-              borderRadius: 15,
-              padding: 20,
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
             }}
           >
-            <Text
-              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
-            >
-              🚗 Nouvelle demande de trajet
-            </Text>
-
-            {selectedRequest && (
-              <>
-                <Text>📧 Email : {selectedRequest.user.email}</Text>
-                <Text>📞 Téléphone : {selectedRequest.user.phone}</Text>
-                <Text>
-                  📍 Lieu de prise : {selectedRequest.user.pickup_point}
-                </Text>
-                <Text>🕔 Heure : {selectedRequest.user.heure}</Text>
-              </>
-            )}
-
             <View
               style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: 20,
+                backgroundColor: "#fff",
+                width: "90%",
+                borderRadius: 15,
+                padding: 20,
               }}
             >
-              <TouchableOpacity
+              <Text
+                style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
+              >
+                🚗 Nouvelle demande de trajet
+              </Text>
+
+              {selectedRequest && (
+                <>
+                  <Text>📧 Email : {selectedRequest.user.email}</Text>
+                  <Text>📞 Téléphone : {selectedRequest.user.phone}</Text>
+                  <Text>
+                    📍 Lieu de prise : {selectedRequest.pickup_point}
+                  </Text>
+                </>
+              )}
+
+              <View
                 style={{
-                  backgroundColor: "green",
-                  padding: 12,
-                  borderRadius: 8,
-                  width: "45%",
-                  alignItems: "center",
-                }}
-                onPress={() => {
-                  console.log("✅ Trajet accepté");
-                  respondToRequest("accepte");
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginTop: 20,
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Accepter
-                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "green",
+                    padding: 12,
+                    borderRadius: 8,
+                    width: "45%",
+                    alignItems: "center",
+                  }}
+                  onPress={() => {
+                    console.log("✅ Trajet accepté");
+                    respondToRequest("accepte");
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Accepter
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "red",
+                    padding: 12,
+                    borderRadius: 8,
+                    width: "45%",
+                    alignItems: "center",
+                  }}
+                  onPress={() => {
+                    console.log("❌ Trajet refusé");
+                    respondToRequest("refuse");
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Refuser
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalCarpoolVisible}
+          onRequestClose={() => setModalCarpoolVisible(false)}
+        >
+          <View style={styles.customModalOverlay}>
+            <View style={styles.customModalBox}>
+              <Text style={styles.customModalTitle}>Actions sur le trajet</Text>
+              <Text style={styles.customModalSubtitle}>
+                Que veux-tu faire ?
+              </Text>
+
+              <TouchableOpacity
+                style={styles.customModalButton}
+                onPress={() => {
+                  if (selectedCarpool)
+                    startCarpool(selectedCarpool.idCarpool, "en_cours");
+                  setModalCarpoolVisible(false);
+                }}
+              >
+                <Text style={styles.customModalButtonText}>Démarrer</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={{
-                  backgroundColor: "red",
-                  padding: 12,
-                  borderRadius: 8,
-                  width: "45%",
-                  alignItems: "center",
-                }}
+                style={styles.customModalButton}
                 onPress={() => {
-                  console.log("❌ Trajet refusé");
-                  respondToRequest("refuse");
+                  if (selectedCarpool)
+                    startCarpool(selectedCarpool.idCarpool, "terminé");
+                  setModalCarpoolVisible(false);
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Refuser
-                </Text>
+                <Text style={styles.customModalButtonText}>Terminer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.customModalButton, styles.customModalButtonRed]}
+                onPress={() => {
+                  if (selectedCarpool) deleteCarpool(selectedCarpool.idCarpool);
+                  setModalCarpoolVisible(false);
+                }}
+              >
+                <Text style={styles.customModalButtonText}>Supprimer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.customModalButton, styles.customModalButtonGray]}
+                onPress={() => setModalCarpoolVisible(false)}
+              >
+                <Text style={styles.customModalButtonText}>Annuler</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
-<Modal
+        </Modal>
+                <Modal
+  visible={acceptedModalVisible}
+  transparent
   animationType="slide"
-  transparent={true}
-  visible={modalCarpoolVisible}
-  onRequestClose={() => setModalCarpoolVisible(false)}
+  onRequestClose={() => setAcceptedModalVisible(false)}
 >
-  <View style={styles.customModalOverlay}>
-    <View style={styles.customModalBox}>
-      <Text style={styles.customModalTitle}>Actions sur le trajet</Text>
-      <Text style={styles.customModalSubtitle}>Que veux-tu faire ?</Text>
+  <View style={{
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center"
+  }}>
+    <View style={{
+      backgroundColor: "#fff",
+      width: "90%",
+      borderRadius: 15,
+      padding: 20
+    }}>
+      <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>
+        Passagers acceptés
+      </Text>
+
+      
+        <Text>Aucun passager accepté pour le moment</Text>
+      
 
       <TouchableOpacity
-        style={styles.customModalButton}
-        onPress={() => {
-          if (selectedCarpool) startCarpool(selectedCarpool.idCarpool, "en_cours");
-          setModalCarpoolVisible(false);
-        }}
+        style={{ marginTop: 20, alignSelf: "center" }}
+        onPress={() => setAcceptedModalVisible(false)}
       >
-        <Text style={styles.customModalButtonText}>Démarrer</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.customModalButton, styles.customModalButtonRed]}
-        onPress={() => {
-          if (selectedCarpool) deleteCarpool(selectedCarpool.idCarpool);
-          setModalCarpoolVisible(false);
-        }}
-      >
-        <Text style={styles.customModalButtonText}>Supprimer</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.customModalButton}
-        onPress={() => {
-          if (selectedCarpool) startCarpool(selectedCarpool.idCarpool, "terminé");
-          setModalCarpoolVisible(false);
-        }}
-      >
-        <Text style={styles.customModalButtonText}>Terminer</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.customModalButton, styles.customModalButtonGray]}
-        onPress={() => setModalCarpoolVisible(false)}
-      >
-        <Text style={styles.customModalButtonText}>Annuler</Text>
+        <Text style={{ color: "#1041b3", fontWeight: "bold" }}>Fermer</Text>
       </TouchableOpacity>
     </View>
   </View>
 </Modal>
 
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Covoiturage</Text>
-        <Text style={[styles.subtitle, { color: colors.subText }]}>
-          Pour une ville plus écologique
-        </Text>
-        <Ionicons
-          name="car-sport-outline"
-          size={22}
-          color={colors.text}
-          style={{ position: "absolute", right: 0, top: 10 }}
-        />
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            {
-              backgroundColor:
-                activeTab === "rechercher"
-                  ? "#1041b3"
-                  : isDark
-                  ? "#1f1f1f"
-                  : "#e6e6e6",
-            },
-          ]}
-          onPress={() => setActiveTab("rechercher")}
-        >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Covoiturage
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.subText }]}>
+            Pour une ville plus écologique
+          </Text>
           <Ionicons
-            name="search"
-            size={16}
-            color={
-              activeTab === "rechercher" ? "#fff" : isDark ? "#fff" : "#000"
-            }
+            name="car-sport-outline"
+            size={22}
+            color={colors.text}
+            style={{ position: "absolute", right: 0, top: 10 }}
           />
-          <Text
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
             style={[
-              styles.tabText,
+              styles.tab,
               {
-                color:
+                backgroundColor:
                   activeTab === "rechercher"
-                    ? "#fff"
+                    ? "#1041b3"
                     : isDark
-                    ? "#fff"
-                    : "#000",
+                    ? "#1f1f1f"
+                    : "#e6e6e6",
               },
             ]}
+            onPress={() => setActiveTab("rechercher")}
           >
-            Rechercher
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            {
-              backgroundColor:
-                activeTab === "creer"
-                  ? "#1041b3"
-                  : isDark
-                  ? "#1f1f1f"
-                  : "#e6e6e6",
-            },
-          ]}
-          onPress={checkCreatePermission}
-        >
-          <Ionicons
-            name="add"
-            size={16}
-            color={activeTab === "creer" ? "#fff" : isDark ? "#fff" : "#000"}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color:
-                  activeTab === "creer" ? "#fff" : isDark ? "#fff" : "#000",
-              },
-            ]}
-          >
-            Créer
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* === CONTENU DES TABS === */}
-      {activeTab === "rechercher" && (
-        <>
-          <View
-            style={[
-              styles.searchBox,
-              { backgroundColor: isDark ? "#1a1a1a" : "#f2f2f2" },
-            ]}
-          >
+            <Ionicons
+              name="search"
+              size={16}
+              color={
+                activeTab === "rechercher" ? "#fff" : isDark ? "#fff" : "#000"
+              }
+            />
             <Text
-              style={[styles.subtitle, { color: isDark ? "#fff" : "#000" }]}
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab === "rechercher"
+                      ? "#fff"
+                      : isDark
+                      ? "#fff"
+                      : "#000",
+                },
+              ]}
             >
-              Où souhaitez-vous aller ?
+              Rechercher
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              {
+                backgroundColor:
+                  activeTab === "creer"
+                    ? "#1041b3"
+                    : isDark
+                    ? "#1f1f1f"
+                    : "#e6e6e6",
+              },
+            ]}
+            onPress={checkCreatePermission}
+          >
+            <Ionicons
+              name="add"
+              size={16}
+              color={activeTab === "creer" ? "#fff" : isDark ? "#fff" : "#000"}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab === "creer" ? "#fff" : isDark ? "#fff" : "#000",
+                },
+              ]}
+            >
+              Créer
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* === CONTENU DES TABS === */}
+        {activeTab === "rechercher" && (
+          <>
+            <View
+              style={[
+                styles.searchBox,
+                { backgroundColor: isDark ? "#1a1a1a" : "#f2f2f2" },
+              ]}
+            >
+              <Text
+                style={[styles.subtitle, { color: isDark ? "#fff" : "#000" }]}
+              >
+                Où souhaitez-vous aller ?
+              </Text>
+
+              <TextInput
+                placeholder="Départ"
+                placeholderTextColor="#888"
+                value={from}
+                onChangeText={setFrom}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: isDark ? "#0f0f0f" : "#e6e6e6",
+                    color: isDark ? "#fff" : "#000",
+                  },
+                ]}
+              />
+
+              <TextInput
+                placeholder="Arrivée"
+                placeholderTextColor="#888"
+                value={to}
+                onChangeText={setTo}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: isDark ? "#0f0f0f" : "#e6e6e6",
+                    color: isDark ? "#fff" : "#000",
+                  },
+                ]}
+              />
+            </View>
+
+            {/* Trajets disponibles */}
+            {(filteredCarpool.length > 0 ? filteredCarpool : carpool).map(
+              (item, index) => (
+                <TouchableOpacity
+                  onLongPress={(event) => handleLongPress(item)}
+                  delayLongPress={200}
+                  key={index}
+                  style={[
+                    styles.tripCard,
+                    { backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tripRoute,
+                      { color: isDark ? "#fff" : "#000" },
+                    ]}
+                  >
+                      {item.from} → {item.to}
+                  </Text>
+                    
+                   {item.driver_id === user.id_user && (
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => openAcceptedModal(item)}
+          >
+            <Text style={{ color: "#1041b3", fontWeight: "bold" }}>Infos</Text>
+          </TouchableOpacity>
+        )}
+                  <Text style={styles.price}>{item.price}</Text>
+
+                  <Text style={styles.tripInfo}>
+                    📅 {item.date} ⏰ {item.time} ⏱ {item.duration}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.subtitle,
+                      { color: isDark ? "#fff" : "#000", marginTop: 6 },
+                    ]}
+                  >
+                    Points clés du trajet :
+                  </Text>
+
+                  {item.keyPlaces.map((place, idx) => (
+                    <Text
+                      key={idx}
+                      style={[styles.tripInfo, { marginLeft: 10 }]}
+                    >
+                      • {place}
+                    </Text>
+                  ))}
+
+                  <View style={styles.driverRow}>
+                    <Image source={item.driver.avatar} style={styles.avatar} />
+
+                    <View>
+                      <Text
+                        style={[
+                          styles.driverName,
+                          { color: isDark ? "#fff" : "#000" },
+                        ]}
+                      >
+                        {item.driver.name}
+                      </Text>
+                      <Text style={styles.driverRating}>
+                        ⭐ {item.driver.rating}
+                      </Text>
+                    </View>
+
+                    <View style={{ marginLeft: "auto", flexDirection: "row" }}>
+                      <Text style={styles.seats}>{item.seats}</Text>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.reserveButton,
+                          item.etat === "EN_COURS"
+                            ? { backgroundColor: "grey" }
+                            : {},
+                        ]}
+                        onPress={() =>
+                          item.etat !== "EN_COURS" && openModal(item)
+                        }
+                        disabled={item.etat === "EN_COURS"} // désactive le bouton si le carpool est en cours
+                      >
+                        <Text style={styles.reserveButtonText}>Réserver</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )
+            )}
+
+            {/* Modal réservation */}
+            <Modal
+              animationType="slide"
+              transparent={true}
+              visible={modalVisible}
+              onRequestClose={() => setModalVisible(false)}
+            >
+              <View style={styles.modalContainer}>
+                <View
+                  style={[
+                    styles.modalContentTrip,
+                    { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
+                  ]}
+                >
+                  {selectedTrip && (
+                    <>
+                      <Text
+                        style={[
+                          styles.modalTitleTrip,
+                          { color: isDark ? "#fff" : "#000" },
+                        ]}
+                      >
+                        Réserver : {selectedTrip.from} → {selectedTrip.to}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.modalText,
+                          { color: isDark ? "#ccc" : "#555" },
+                        ]}
+                      >
+                        Date : {selectedTrip.date} | Heure : {selectedTrip.time}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.modalText,
+                          { color: isDark ? "#ccc" : "#555" },
+                        ]}
+                      >
+                        Durée : {selectedTrip.duration}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.modalText,
+                          { color: isDark ? "#ccc" : "#555" },
+                        ]}
+                      >
+                        Points clés : {selectedTrip.keyPlaces.join(", ")}
+                      </Text>
+                      <Text style={[styles.modalPrice, { color: "#1041b3" }]}>
+                        Prix : {selectedTrip.price}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.modalText,
+                          { color: isDark ? "#ccc" : "#555", marginTop: 10 },
+                        ]}
+                      >
+                        Où allez-vous monter ?
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5",
+                            color: isDark ? "#fff" : "#000",
+                            marginBottom: 15,
+                          },
+                        ]}
+                        placeholder="Adresse de montée"
+                        placeholderTextColor={isDark ? "#888" : "#999"}
+                        value={pickupPoint}
+                        onChangeText={setPickupPoint}
+                      />
+                      <View style={styles.modalButtonContainer}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.confirmButton]}
+                          onPress={handleConfirmReservation}
+                        >
+                          <Text style={styles.modalButtonText}>Confirmer</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.closeButton]}
+                          onPress={() => setModalVisible(false)}
+                        >
+                          <Text style={styles.modalButtonText}>Fermer</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            </Modal>
+          </>
+        )}
+
+        {/* Tab créer */}
+        {activeTab === "creer" && hasCreatePermission && (
+          <View>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "600",
+                color: isDark ? "#fff" : "#000",
+                marginBottom: 16,
+              }}
+            >
+              Proposer un trajet
             </Text>
 
             <TextInput
               placeholder="Départ"
               placeholderTextColor="#888"
-              value={from}
-              onChangeText={setFrom}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? "#0f0f0f" : "#e6e6e6",
-                  color: isDark ? "#fff" : "#000",
-                },
-              ]}
-            />
-
-            <TextInput
-              placeholder="Arrivée"
-              placeholderTextColor="#888"
-              value={to}
-              onChangeText={setTo}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? "#0f0f0f" : "#e6e6e6",
-                  color: isDark ? "#fff" : "#000",
-                },
-              ]}
-            />
-          </View>
-
-          {/* Trajets disponibles */}
-          {(filteredCarpool.length > 0 ? filteredCarpool : carpool).map(
-            (item, index) => (
-              <TouchableOpacity
-              onLongPress={(event) => handleLongPress(item)}
-              delayLongPress={200}
-                key={index}
-                style={[
-                  styles.tripCard,
-                  { backgroundColor: isDark ? "#1a1a1a" : "#f4f4f4" },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tripRoute,
-                    { color: isDark ? "#fff" : "#000" },
-                  ]}
-                >
-                  {item.from} → {item.to}
-                </Text>
-
-                <Text style={styles.price}>{item.price}</Text>
-
-                <Text style={styles.tripInfo}>
-                  📅 {item.date} ⏰ {item.time} ⏱ {item.duration}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.subtitle,
-                    { color: isDark ? "#fff" : "#000", marginTop: 6 },
-                  ]}
-                >
-                  Points clés du trajet :
-                </Text>
-
-                {item.keyPlaces.map((place, idx) => (
-                  <Text key={idx} style={[styles.tripInfo, { marginLeft: 10 }]}>
-                    • {place}
-                  </Text>
-                ))}
-
-                <View style={styles.driverRow}>
-                  <Image source={item.driver.avatar} style={styles.avatar} />
-
-                  <View>
-                    <Text
-                      style={[
-                        styles.driverName,
-                        { color: isDark ? "#fff" : "#000" },
-                      ]}
-                    >
-                      {item.driver.name}
-                    </Text>
-                    <Text style={styles.driverRating}>
-                      ⭐ {item.driver.rating}
-                    </Text>
-                  </View>
-
-                  <View style={{ marginLeft: "auto", flexDirection: "row" }}>
-                    <Text style={styles.seats}>{item.seats}</Text>
-
-                    <TouchableOpacity
-  style={[
-    styles.reserveButton,
-    item.etat === "EN_COURS" ? { backgroundColor: "grey" } : {},
-  ]}
-  onPress={() => item.etat !== "EN_COURS" && openModal(item)}
-  disabled={item.etat === "EN_COURS"} // désactive le bouton si le carpool est en cours
->
-  <Text style={styles.reserveButtonText}>Réserver</Text>
-</TouchableOpacity>
-
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )
-          )}
-
-          {/* Modal réservation */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={modalVisible}
-            onRequestClose={() => setModalVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <View
-                style={[
-                  styles.modalContentTrip,
-                  { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
-                ]}
-              >
-                {selectedTrip && (
-                  <>
-                    <Text
-                      style={[
-                        styles.modalTitleTrip,
-                        { color: isDark ? "#fff" : "#000" },
-                      ]}
-                    >
-                      Réserver : {selectedTrip.from} → {selectedTrip.to}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.modalText,
-                        { color: isDark ? "#ccc" : "#555" },
-                      ]}
-                    >
-                      Date : {selectedTrip.date} | Heure : {selectedTrip.time}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.modalText,
-                        { color: isDark ? "#ccc" : "#555" },
-                      ]}
-                    >
-                      Durée : {selectedTrip.duration}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.modalText,
-                        { color: isDark ? "#ccc" : "#555" },
-                      ]}
-                    >
-                      Points clés : {selectedTrip.keyPlaces.join(", ")}
-                    </Text>
-                    <Text style={[styles.modalPrice, { color: "#1041b3" }]}>
-                      Prix : {selectedTrip.price}
-                    </Text>
-                    <View style={styles.modalButtonContainer}>
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.confirmButton]}
-                        onPress={handleConfirmReservation}
-                      >
-                        <Text style={styles.modalButtonText}>Confirmer</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.modalButton, styles.closeButton]}
-                        onPress={() => setModalVisible(false)}
-                      >
-                        <Text style={styles.modalButtonText}>Fermer</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-          </Modal>
-        </>
-      )}
-
-      {/* Tab créer */}
-      {activeTab === "creer" && hasCreatePermission && (
-        <View>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              color: isDark ? "#fff" : "#000",
-              marginBottom: 16,
-            }}
-          >
-            Proposer un trajet
-          </Text>
-
-          <TextInput
-            placeholder="Départ"
-            placeholderTextColor="#888"
-            value={depart}
-            onChangeText={setDepart}
-            style={[
-              styles.input,
-              {
-                backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
-                color: isDark ? "#fff" : "#000",
-              },
-            ]}
-          />
-          <TextInput
-            placeholder="Arrivée"
-            placeholderTextColor="#888"
-            value={arrivee}
-            onChangeText={setArrivee}
-            style={[
-              styles.input,
-              {
-                backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
-                color: isDark ? "#fff" : "#000",
-              },
-            ]}
-          />
-
-          {/* ✅ Nouveau : Sélecteur de date et heure avec react-native-date-picker */}
-          {/* Sélecteur de date SIMPLE sans installation */}
-          <View>
-            <TextInput
-              placeholder="Date de départ (ex: 2024-12-25 14:30)"
-              placeholderTextColor="#888"
-              value={dateInput}
-              onChangeText={setDateInput}
+              value={depart}
+              onChangeText={setDepart}
               style={[
                 styles.input,
                 {
@@ -1522,77 +1628,114 @@ const deleteCarpool = async (id:number) => {
                 },
               ]}
             />
-            <Text
+            <TextInput
+              placeholder="Arrivée"
+              placeholderTextColor="#888"
+              value={arrivee}
+              onChangeText={setArrivee}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
+                  color: isDark ? "#fff" : "#000",
+                },
+              ]}
+            />
+
+            {/* ✅ Nouveau : Sélecteur de date et heure avec react-native-date-picker */}
+            {/* Sélecteur de date SIMPLE sans installation */}
+            <View>
+              <TextInput
+                placeholder="Date de départ (ex: 2024-12-25 14:30)"
+                placeholderTextColor="#888"
+                value={dateInput}
+                onChangeText={setDateInput}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
+                    color: isDark ? "#fff" : "#000",
+                  },
+                ]}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: isDark ? "#aaa" : "#666",
+                  marginBottom: 12,
+                  marginTop: -8,
+                }}
+              >
+                Format : AAAA-MM-JJ HH:MM (ex: 2024-12-25 14:30)
+              </Text>
+            </View>
+
+            <TextInput
+              placeholder="Points clés du trajet (séparés par ,)"
+              placeholderTextColor="#888"
+              value={pointsCles}
+              onChangeText={setPointsCles}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
+                  color: isDark ? "#fff" : "#000",
+                },
+              ]}
+            />
+            <TextInput
+              placeholder="Nombre de places disponibles"
+              placeholderTextColor="#888"
+              value={places}
+              onChangeText={setPlaces}
+              keyboardType="numeric"
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
+                  color: isDark ? "#fff" : "#000",
+                },
+              ]}
+            />
+            <TextInput
+              placeholder="Prix (FCFA)"
+              placeholderTextColor="#888"
+              value={prix}
+              onChangeText={setPrix}
+              keyboardType="numeric"
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
+                  color: isDark ? "#fff" : "#000",
+                },
+              ]}
+            />
+
+            <TouchableOpacity
+              onPress={handleSubmit}
               style={{
-                fontSize: 12,
-                color: isDark ? "#aaa" : "#666",
-                marginBottom: 12,
-                marginTop: -8,
+                backgroundColor: "#1041b3",
+                padding: 14,
+                borderRadius: 14,
+                alignItems: "center",
+                marginTop: 16,
               }}
             >
-              Format : AAAA-MM-JJ HH:MM (ex: 2024-12-25 14:30)
-            </Text>
+              <Text style={{ color: "#fff", fontWeight: "700" }}>
+                Publier le trajet
+              </Text>
+            </TouchableOpacity>
           </View>
-
-          <TextInput
-            placeholder="Points clés du trajet (séparés par ,)"
-            placeholderTextColor="#888"
-            value={pointsCles}
-            onChangeText={setPointsCles}
-            style={[
-              styles.input,
-              {
-                backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
-                color: isDark ? "#fff" : "#000",
-              },
-            ]}
-          />
-          <TextInput
-            placeholder="Nombre de places disponibles"
-            placeholderTextColor="#888"
-            value={places}
-            onChangeText={setPlaces}
-            keyboardType="numeric"
-            style={[
-              styles.input,
-              {
-                backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
-                color: isDark ? "#fff" : "#000",
-              },
-            ]}
-          />
-          <TextInput
-            placeholder="Prix (FCFA)"
-            placeholderTextColor="#888"
-            value={prix}
-            onChangeText={setPrix}
-            keyboardType="numeric"
-            style={[
-              styles.input,
-              {
-                backgroundColor: isDark ? "#1a1a1a" : "#e6e6e6",
-                color: isDark ? "#fff" : "#000",
-              },
-            ]}
-          />
-
-          <TouchableOpacity
-            onPress={handleSubmit}
-            style={{
-              backgroundColor: "#1041b3",
-              padding: 14,
-              borderRadius: 14,
-              alignItems: "center",
-              marginTop: 16,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>
-              Publier le trajet
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+      <AlertModal
+        visible={alertVisible}
+        type={alertType}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
+    </>
   );
 }
 
@@ -1622,6 +1765,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
+  infoButton: {
+  paddingVertical: 4,
+  paddingHorizontal: 10,
+  backgroundColor: "#e6f0ff", // couleur légère pour le bouton
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: "#1041b3",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
   tab: {
     flexDirection: "row",
     alignItems: "center",
