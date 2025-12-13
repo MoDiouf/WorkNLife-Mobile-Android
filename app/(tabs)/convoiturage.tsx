@@ -1,24 +1,22 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  useColorScheme,
-  Modal,
-  Dimensions,
-  Alert,
-} from "react-native";
+import AlertModal from "@/components/AlertModal";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
-import DatePicker from "react-native-date-picker";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from "react-native";
 import { io, Socket } from "socket.io-client";
-import AlertModal from "@/components/AlertModal";
 
 const { width } = Dimensions.get("window");
 interface BackendDriver {
@@ -142,8 +140,6 @@ export default function Convoiturage() {
     const fetchUserData = async () => {
     const raw = await AsyncStorage.getItem("userData");
     const parsed = JSON.parse(raw || "{}");
-    console.log(user);
-    
     setUser(parsed);
   };
     fetchUserData();
@@ -291,8 +287,6 @@ export default function Convoiturage() {
       }
 
       const data = await response.json();
-      console.log("Retour: ", data);
-
       if (data.allowed === true) {
         setHasCreatePermission(true);
         setActiveTab("creer");
@@ -531,7 +525,7 @@ export default function Convoiturage() {
       );
     }
   };
-  const respondToRequest = async (status: any) => {
+  const respondToRequest = async (status: any,id_request:number) => {
     try {
       const token = await AsyncStorage.getItem("mobile_token");
 
@@ -548,7 +542,7 @@ export default function Convoiturage() {
         },
         body: JSON.stringify({
           status: status, // "accepte" ou "refuse"
-          request_id: selectedRequest.rideRequestId, // ✅ important
+          request_id: id_request, // ✅ important
         }),
       });
 
@@ -635,15 +629,20 @@ export default function Convoiturage() {
 const [acceptedRequests, setAcceptedRequests] = useState([]);
 
 const openAcceptedModal = async (trip:any) => {
+  //console.log("Modal",trip);
+  
   try {
     const token = await AsyncStorage.getItem("mobile_token");
     const response = await fetch(
-      `http://192.168.1.18:3000/carpools/accepted-requests/${trip.id}`,
+      `http://192.168.1.18:3000/carpools/accepted-requests/${trip.idCarpool}`,
       {
+        method:"GET",
         headers: { Authorization: `Bearer ${token}` },
       }
     );
     const data = await response.json();
+    console.log("Retour", data);
+    
     setAcceptedRequests(data);
     setAcceptedModalVisible(true);
   } catch (err) {
@@ -1132,15 +1131,15 @@ const openAcceptedModal = async (trip:any) => {
               <Text
                 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
               >
-                🚗 Nouvelle demande de trajet
+                Nouvelle demande de trajet
               </Text>
 
               {selectedRequest && (
                 <>
-                  <Text>📧 Email : {selectedRequest.user.email}</Text>
-                  <Text>📞 Téléphone : {selectedRequest.user.phone}</Text>
+                  <Text>Email : {selectedRequest.user.email}</Text>
+                  <Text>Téléphone : {selectedRequest.user.phone}</Text>
                   <Text>
-                    📍 Lieu de prise : {selectedRequest.pickup_point}
+                    Lieu de prise : {selectedRequest.pickup_point}
                   </Text>
                 </>
               )}
@@ -1162,7 +1161,7 @@ const openAcceptedModal = async (trip:any) => {
                   }}
                   onPress={() => {
                     console.log("✅ Trajet accepté");
-                    respondToRequest("accepte");
+                    respondToRequest("accepte",selectedRequest.id_request);
                   }}
                 >
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>
@@ -1180,7 +1179,7 @@ const openAcceptedModal = async (trip:any) => {
                   }}
                   onPress={() => {
                     console.log("❌ Trajet refusé");
-                    respondToRequest("refuse");
+                    respondToRequest("refuse",selectedRequest.id_request);
                   }}
                 >
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>
@@ -1264,11 +1263,16 @@ const openAcceptedModal = async (trip:any) => {
       <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>
         Passagers acceptés
       </Text>
-
-      
+{acceptedRequests.length > 0 ? (
+        acceptedRequests.map((req :any) => (
+          <View key={req.user.email} style={{ marginBottom: 10 }}>
+            <Text>{req.user.name} ({req.user.phone})</Text>
+            <Text>Point de montée : {req.pickupPoint}</Text>
+          </View>
+        ))
+      ) : (
         <Text>Aucun passager accepté pour le moment</Text>
-      
-
+      )}
       <TouchableOpacity
         style={{ marginTop: 20, alignSelf: "center" }}
         onPress={() => setAcceptedModalVisible(false)}
@@ -1433,14 +1437,7 @@ const openAcceptedModal = async (trip:any) => {
                       {item.from} → {item.to}
                   </Text>
                     
-                   {item.driver_id === user.id_user && (
-          <TouchableOpacity
-            style={styles.infoButton}
-            onPress={() => openAcceptedModal(item)}
-          >
-            <Text style={{ color: "#1041b3", fontWeight: "bold" }}>Infos</Text>
-          </TouchableOpacity>
-        )}
+                   
                   <Text style={styles.price}>{item.price}</Text>
 
                   <Text style={styles.tripInfo}>
@@ -1484,7 +1481,14 @@ const openAcceptedModal = async (trip:any) => {
 
                     <View style={{ marginLeft: "auto", flexDirection: "row" }}>
                       <Text style={styles.seats}>{item.seats}</Text>
-
+                        {item.driver_id === user.id_user && (
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => openAcceptedModal(item)}
+          >
+            <Text style={{ color: "#1041b3", fontWeight: "bold" }}>Infos</Text>
+          </TouchableOpacity>
+        )}
                       <TouchableOpacity
                         style={[
                           styles.reserveButton,
@@ -1500,6 +1504,7 @@ const openAcceptedModal = async (trip:any) => {
                         <Text style={styles.reserveButtonText}>Réserver</Text>
                       </TouchableOpacity>
                     </View>
+                    
                   </View>
                 </TouchableOpacity>
               )
@@ -1774,6 +1779,7 @@ const styles = StyleSheet.create({
   borderColor: "#1041b3",
   justifyContent: "center",
   alignItems: "center",
+  marginLeft:2
 },
 
   tab: {
