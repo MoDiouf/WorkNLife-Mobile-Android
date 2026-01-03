@@ -96,7 +96,7 @@ export default function Convoiturage() {
     try {
       const token = await AsyncStorage.getItem("mobile_token");
 
-      const response = await fetch("http://192.168.1.18:3000/carpools", {
+      const response = await fetch("http://192.168.1.23:3000/carpools", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -145,7 +145,7 @@ export default function Convoiturage() {
     fetchUserData();
     fetchCovoiturage();
   }, []);
-  const SOCKET_URL = "http://192.168.1.18:3000";
+  const SOCKET_URL = "http://192.168.1.23:3000";
   useEffect(() => {
     const initializeSocket = async () => {
       try {
@@ -202,7 +202,7 @@ export default function Convoiturage() {
           return;
         }
 
-        const res = await fetch(`http://192.168.1.18:3000/carpools/requests`, {
+        const res = await fetch(`http://192.168.1.23:3000/carpools/requests`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -272,7 +272,7 @@ export default function Convoiturage() {
       const token = await AsyncStorage.getItem("mobile_token");
 
       const response = await fetch(
-        "http://192.168.1.18:3000/carpools/check-permission",
+        "http://192.168.1.23:3000/carpools/check-permission",
         {
           method: "GET",
           headers: {
@@ -341,7 +341,7 @@ export default function Convoiturage() {
       } as any);
 
       const response = await fetch(
-        "http://192.168.1.18:3000/users/request-driver",
+        "http://192.168.1.23:3000/users/request-driver",
         {
           method: "POST",
           headers: {
@@ -425,13 +425,9 @@ export default function Convoiturage() {
     console.log("Trajet envoyé :", trajet);
     console.log("Date ISO :", departureDateTime.toISOString());
 
-    // Ici votre fetch API...
-
-    // Exemple :
-
     try {
       const token = await AsyncStorage.getItem("mobile_token");
-      const response = await fetch("http://192.168.1.18:3000/carpools", {
+      const response = await fetch("http://192.168.1.23:3000/carpools", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -495,7 +491,7 @@ export default function Convoiturage() {
     const token = await AsyncStorage.getItem("mobile_token");
     try {
       const response = await fetch(
-        "http://192.168.1.18:3000/carpools/demande",
+        "http://192.168.1.23:3000/carpools/demande",
         {
           method: "POST",
           headers: {
@@ -534,7 +530,7 @@ export default function Convoiturage() {
         return;
       }
 
-      const res = await fetch(`http://192.168.1.18:3000/carpools/status`, {
+      const res = await fetch(`http://192.168.1.23:3000/carpools/status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -580,7 +576,7 @@ export default function Convoiturage() {
   };
   const startCarpool = async (id: number, status: string) => {
     try {
-      const response = await fetch(`http://192.168.1.18:3000/carpools/status`, {
+      const response = await fetch(`http://192.168.1.23:3000/carpools/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -607,7 +603,7 @@ export default function Convoiturage() {
     //console.log("Id recuperer",id);
 
     try {
-      const response = await fetch(`http://192.168.1.18:3000/carpools/${id}`, {
+      const response = await fetch(`http://192.168.1.23:3000/carpools/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -634,7 +630,7 @@ const openAcceptedModal = async (trip:any) => {
   try {
     const token = await AsyncStorage.getItem("mobile_token");
     const response = await fetch(
-      `http://192.168.1.18:3000/carpools/accepted-requests/${trip.idCarpool}`,
+      `http://192.168.1.7:3000/carpools/accepted-requests/${trip.idCarpool}`,
       {
         method:"GET",
         headers: { Authorization: `Bearer ${token}` },

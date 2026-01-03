@@ -27,7 +27,7 @@ export default function Repas() {
         const token = await AsyncStorage.getItem("mobile_token");
 
         const response = await fetch(
-          "http://192.168.1.18:3000/menus/allmenus",
+          "http://192.168.1.23:3000/menus/allmenus",
           {
             method: "GET",
             headers: {

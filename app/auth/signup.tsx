@@ -35,7 +35,7 @@ const isDark = theme === "dark";
   console.log("Signup data :", form);
 
   try {
-    const response = await fetch("http://192.168.1.18:3000/users", {
+    const response = await fetch("http://192.168.1.23:3000/users", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
